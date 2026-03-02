@@ -40,9 +40,31 @@ export function CoachTab({ coach, messages, onSend, onActivityLog }: Props) {
   const fileRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
+  // Auto-scroll to bottom on new messages
   useEffect(() => {
-    if (feedRef.current) feedRef.current.scrollTop = feedRef.current.scrollHeight
+    if (feedRef.current) {
+      feedRef.current.scrollTop = feedRef.current.scrollHeight
+    }
   }, [messages])
+
+  // Handle mobile keyboard - keep input visible
+  useEffect(() => {
+    const handleVisualViewportChange = () => {
+      if (feedRef.current) {
+        const viewportHeight = window.visualViewport?.height || window.innerHeight
+        const offset = window.innerHeight - viewportHeight
+        if (offset > 0) {
+          // Keyboard is open - scroll input into view
+          setTimeout(() => {
+            textareaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          }, 100)
+        }
+      }
+    }
+
+    window.visualViewport?.addEventListener('resize', handleVisualViewportChange)
+    return () => window.visualViewport?.removeEventListener('resize', handleVisualViewportChange)
+  }, [])
 
   function handleSend() {
     const t = text.trim()
