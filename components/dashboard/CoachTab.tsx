@@ -40,10 +40,14 @@ export function CoachTab({ coach, messages, onSend, onActivityLog }: Props) {
   const fileRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  // Auto-scroll to bottom on new messages
+  // Auto-scroll to bottom on new messages (only if user was near bottom)
   useEffect(() => {
     if (feedRef.current) {
-      feedRef.current.scrollTop = feedRef.current.scrollHeight
+      const { scrollTop, scrollHeight, clientHeight } = feedRef.current
+      const isNearBottom = scrollHeight - scrollTop - clientHeight < 100
+      if (isNearBottom) {
+        feedRef.current.scrollTo({ top: feedRef.current.scrollHeight, behavior: 'smooth' })
+      }
     }
   }, [messages])
 
