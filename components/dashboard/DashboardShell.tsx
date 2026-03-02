@@ -109,6 +109,18 @@ export function DashboardShell({ profile, userId, initialFoodLogs, initialActivi
     }
 
     const updatedMessages = [...apiMessages, userMessage]
+
+    // Strip image data from older messages to keep history lightweight
+    // Only the most recent image message needs the actual bytes
+    const trimmedMessages = updatedMessages.map((msg, idx) => {
+      if (idx === updatedMessages.length - 1) return msg
+      if (typeof msg.content === 'string') return msg
+      const hasImage = msg.content.some(b => b.type === 'image')
+      if (!hasImage) return msg
+      const textOnly = msg.content.filter(b => b.type === 'text')
+      return { role: msg.role, content: textOnly.length ? textOnly : [{ type: 'text' as const, text: '[food photo]' }] }
+    })
+
     setApiMessages(updatedMessages)
 
     const contextString = await buildContextString(userId)
@@ -126,7 +138,7 @@ export function DashboardShell({ profile, userId, initialFoodLogs, initialActivi
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ messages: updatedMessages, system }),
+        body: JSON.stringify({ messages: trimmedMessages, system }),
       })
 
       // Remove loading bubble

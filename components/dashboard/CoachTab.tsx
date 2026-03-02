@@ -89,8 +89,20 @@ export function CoachTab({ coach, messages, onSend, onActivityLog }: Props) {
     const reader = new FileReader()
     reader.onload = ev => {
       const dataUrl = ev.target?.result as string
-      setPendingImage({ base64: dataUrl.split(',')[1], mediaType: file.type || 'image/jpeg', previewUrl: dataUrl })
-      setText('What are the macros for this food?')
+      // Compress image to stay well under Vercel's 4.5MB body limit
+      const img = new Image()
+      img.onload = () => {
+        const MAX = 1024
+        const scale = Math.min(1, MAX / Math.max(img.width, img.height))
+        const canvas = document.createElement('canvas')
+        canvas.width = Math.round(img.width * scale)
+        canvas.height = Math.round(img.height * scale)
+        canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height)
+        const compressed = canvas.toDataURL('image/jpeg', 0.82)
+        setPendingImage({ base64: compressed.split(',')[1], mediaType: 'image/jpeg', previewUrl: compressed })
+        setText('What are the macros for this food?')
+      }
+      img.src = dataUrl
     }
     reader.readAsDataURL(file)
     e.target.value = ''

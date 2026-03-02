@@ -1,3 +1,5 @@
+export const maxDuration = 30 // seconds — vision calls can be slow
+
 import { createClient } from '@/lib/supabase/server'
 import { checkRateLimit, validateMessages, classifyMessage } from '@/lib/guardrails'
 import type { ChatMessage } from '@/types'
