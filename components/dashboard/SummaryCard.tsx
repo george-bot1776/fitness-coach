@@ -16,7 +16,7 @@ export function SummaryCard({ summary }: Props) {
           <div key={i} className="py-3.5 px-2 text-center"
                style={{ borderRight: i < 3 ? '1px solid var(--fc-border)' : 'none' }}>
             <span className="block text-base font-semibold"
-                  style={{ fontFamily: 'var(--font-jetbrains-mono)', color: 'var(--fc-coach-accent)' }}>
+                  style={{ fontFamily: 'var(--font-space-mono)', color: 'var(--fc-coach-accent)' }}>
               {s.val}
             </span>
             <span className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--fc-text-dim)' }}>

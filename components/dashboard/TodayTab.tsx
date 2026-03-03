@@ -18,61 +18,41 @@ interface Props {
   onWeightSaved: (lbs: number) => void
 }
 
-function WeightSparkline({ history, color }: { history: WeightLog[]; color: string }) {
-  if (history.length < 2) return null
-
-  const W = 280
-  const H = 48
-  const pad = 4
-  const weights = history.map(w => w.weight_lbs)
-  const min = Math.min(...weights)
-  const max = Math.max(...weights)
+function Sparkline({ data, width = 100, height = 30, color }: { data: number[]; width?: number; height?: number; color: string }) {
+  if (data.length < 2) return null
+  const pad = 2
+  const min = Math.min(...data) - 0.5
+  const max = Math.max(...data) + 0.5
   const range = max - min || 1
 
-  const points = history.map((w, i) => {
-    const x = pad + (i / (history.length - 1)) * (W - pad * 2)
-    const y = H - pad - ((w.weight_lbs - min) / range) * (H - pad * 2)
-    return `${x},${y}`
+  const pts = data.map((v, i) => {
+    const x = pad + (i / (data.length - 1)) * (width - pad * 2)
+    const y = height - pad - ((v - min) / range) * (height - pad * 2)
+    return [x, y] as [number, number]
   })
 
-  const first = weights[0]
-  const last = weights[weights.length - 1]
-  const delta = last - first
-  const deltaStr = delta === 0 ? '—' : `${delta > 0 ? '+' : ''}${delta.toFixed(1)} lbs`
-  const deltaColor = delta < 0 ? 'var(--fc-success)' : delta > 0 ? 'var(--fc-danger)' : 'var(--fc-text-dim)'
+  const polylineStr = pts.map(p => p.join(',')).join(' ')
+  const areaStr = `0,${height} ${polylineStr} ${width},${height}`
+  const lastPt = pts[pts.length - 1]
 
   return (
-    <div className="space-y-1.5">
-      <div className="flex items-center justify-between">
-        <span className="text-xs" style={{ color: 'var(--fc-text-dim)' }}>
-          {history.length} entries · {new Date(history[0].logged_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} → today
-        </span>
-        <span className="text-xs font-bold" style={{ color: deltaColor }}>{deltaStr}</span>
-      </div>
-      <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display: 'block' }}>
-        <polyline
-          points={points.join(' ')}
-          fill="none"
-          stroke={color}
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          opacity="0.8"
-        />
-        {/* End dot */}
-        {(() => {
-          const last = points[points.length - 1].split(',')
-          return <circle cx={last[0]} cy={last[1]} r="3" fill={color} />
-        })()}
-      </svg>
-    </div>
+    <svg width={width} height={height} style={{ display: 'block', overflow: 'visible' }}>
+      <defs>
+        <linearGradient id={`sg-${color.replace('#', '')}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.3" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <polygon points={areaStr} fill={`url(#sg-${color.replace('#', '')})`} />
+      <polyline points={polylineStr} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
+      <circle cx={lastPt[0]} cy={lastPt[1]} r={3} fill={color} />
+    </svg>
   )
 }
 
 export function TodayTab({ foodLog, dailySummary, dinnerSuggestion, coach, calorieTarget, userId, weightLbs, weightHistory, onWeightSaved }: Props) {
   const [weightInput, setWeightInput] = useState('')
   const [saving, setSaving] = useState(false)
-  const [showHistory, setShowHistory] = useState(false)
 
   const totals = foodLog.reduce(
     (acc, f) => ({ protein: acc.protein + f.protein, carbs: acc.carbs + f.carbs, fat: acc.fat + f.fat }),
@@ -83,6 +63,12 @@ export function TodayTab({ foodLog, dailySummary, dinnerSuggestion, coach, calor
     carbs: Math.round((calorieTarget * 0.45) / 4),
     fat: Math.round((calorieTarget * 0.25) / 9),
   }
+  const caloriesEaten = foodLog.reduce((s, f) => s + f.calories, 0)
+
+  // Weekly weight delta
+  const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7)
+  const weekOldEntry = weightHistory.find(w => new Date(w.logged_date) >= weekAgo)
+  const weekDelta = weightLbs && weekOldEntry ? weightLbs - weekOldEntry.weight_lbs : null
 
   async function handleLogWeight() {
     const lbs = parseFloat(weightInput)
@@ -94,117 +80,177 @@ export function TodayTab({ foodLog, dailySummary, dinnerSuggestion, coach, calor
     setSaving(false)
   }
 
+  const cardStyle = {
+    background: 'rgba(255,255,255,0.04)',
+    border: '1px solid rgba(255,255,255,0.06)',
+    borderRadius: 16,
+  }
+
   return (
-    <div className="flex-1 overflow-y-auto p-4 space-y-4">
+    <div style={{ flex: 1, overflowY: 'auto', padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: 20 }}>
 
       {/* Weight card */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <span className="text-[11px] font-bold uppercase tracking-widest" style={{ color: 'var(--fc-text-dim)' }}>
-            Weight
-          </span>
-          {weightHistory.length >= 2 && (
-            <button
-              onClick={() => setShowHistory(v => !v)}
-              className="text-[11px] font-semibold"
-              style={{ color: coach.color }}
-            >
-              {showHistory ? 'Hide history' : `${weightHistory.length}-day trend`}
-            </button>
-          )}
+      <div>
+        <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(255,255,255,0.3)', marginBottom: 10 }}>
+          Weight
         </div>
-
-        <div className="rounded-2xl px-4 py-3 space-y-3"
-             style={{ background: 'var(--fc-surface2)', border: '1px solid var(--fc-border)' }}>
-          <div className="flex items-center gap-3">
-            <span className="text-xl">⚖️</span>
+        <div style={{ ...cardStyle, padding: '16px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <div style={{
+              width: 44, height: 44, borderRadius: 12,
+              background: 'rgba(255,255,255,0.05)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20,
+            }}>⚖️</div>
             {weightLbs ? (
-              <div className="flex-1 flex items-center justify-between">
-                <div>
-                  <span className="text-lg font-bold" style={{ fontFamily: 'var(--font-jetbrains-mono)', color: coach.color }}>
-                    {weightLbs} lbs
+              <div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                  <span style={{ fontFamily: 'var(--font-space-mono)', fontWeight: 700, fontSize: 28, color: coach.color, lineHeight: 1 }}>
+                    {weightLbs}
                   </span>
-                  <span className="block text-xs" style={{ color: 'var(--fc-text-dim)' }}>Logged today</span>
+                  <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.4)' }}>lbs</span>
                 </div>
-                {/* Allow re-logging */}
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    placeholder="Update"
-                    value={weightInput}
-                    onChange={e => setWeightInput(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && handleLogWeight()}
-                    className="w-20 bg-transparent text-sm outline-none text-right"
-                    style={{ color: 'var(--fc-text-dim)' }}
-                  />
-                  {weightInput && (
-                    <button
-                      onClick={handleLogWeight}
-                      disabled={saving}
-                      className="rounded-xl px-2.5 py-1 text-xs font-bold"
-                      style={{ background: coach.color, color: '#000' }}
-                    >
-                      {saving ? '…' : 'Save'}
-                    </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                  <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>Logged today</span>
+                  {weekDelta !== null && (
+                    <span style={{ fontSize: 11, fontWeight: 600, color: weekDelta <= 0 ? '#3DDC84' : '#FF4444' }}>
+                      {weekDelta <= 0 ? '↓' : '↑'} {Math.abs(weekDelta).toFixed(1)} lbs this week
+                    </span>
                   )}
                 </div>
               </div>
             ) : (
-              <div className="flex-1 flex items-center gap-2">
+              <div>
                 <input
                   type="number"
-                  placeholder="Enter weight (lbs)"
+                  placeholder="Log your weight (lbs)"
                   value={weightInput}
                   onChange={e => setWeightInput(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && handleLogWeight()}
-                  className="flex-1 bg-transparent text-sm outline-none"
-                  style={{ color: 'var(--fc-text)' }}
+                  style={{
+                    background: 'none', border: 'none', outline: 'none',
+                    color: '#F1F1F1', fontSize: 14, fontFamily: 'var(--font-dm-sans)',
+                    width: 180,
+                  }}
                 />
-                <button
-                  onClick={handleLogWeight}
-                  disabled={saving || !weightInput}
-                  className="rounded-xl px-3 py-1.5 text-xs font-bold transition-opacity"
-                  style={{ background: coach.color, color: '#000', opacity: !weightInput ? 0.4 : 1 }}
-                >
-                  {saving ? '…' : 'Log'}
-                </button>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 2 }}>
+                  Step on the scale and let me know
+                </div>
               </div>
             )}
           </div>
 
-          {/* Sparkline */}
-          {showHistory && weightHistory.length >= 2 && (
-            <WeightSparkline history={weightHistory} color={coach.color} />
-          )}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+            {weightHistory.length >= 2 && (
+              <Sparkline data={weightHistory.map(w => w.weight_lbs)} color={coach.color} width={100} height={30} />
+            )}
+            {weightLbs ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <input
+                  type="number"
+                  placeholder="Update"
+                  value={weightInput}
+                  onChange={e => setWeightInput(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleLogWeight()}
+                  style={{
+                    width: 70, background: 'none', border: 'none', outline: 'none',
+                    color: 'rgba(255,255,255,0.4)', fontSize: 12,
+                    fontFamily: 'var(--font-dm-sans)', textAlign: 'right',
+                  }}
+                />
+                {weightInput ? (
+                  <button onClick={handleLogWeight} disabled={saving} style={{
+                    padding: '4px 10px', borderRadius: 8,
+                    background: coach.color, border: 'none',
+                    color: '#000', fontSize: 11, fontWeight: 700,
+                    cursor: 'pointer', fontFamily: 'var(--font-dm-sans)',
+                  }}>
+                    {saving ? '…' : 'Save'}
+                  </button>
+                ) : (
+                  <button style={{
+                    padding: '4px 10px', borderRadius: 8,
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    background: 'rgba(255,255,255,0.04)',
+                    color: 'rgba(255,255,255,0.45)',
+                    fontSize: 11, fontFamily: 'var(--font-dm-sans)', cursor: 'pointer',
+                  }}>Update</button>
+                )}
+              </div>
+            ) : weightInput ? (
+              <button onClick={handleLogWeight} disabled={saving} style={{
+                padding: '6px 14px', borderRadius: 8,
+                background: coach.gradient, border: 'none',
+                color: '#fff', fontSize: 12, fontWeight: 700,
+                cursor: 'pointer', fontFamily: 'var(--font-dm-sans)',
+              }}>
+                {saving ? '…' : 'Log'}
+              </button>
+            ) : null}
+          </div>
         </div>
+      </div>
 
-        {/* History list */}
-        {showHistory && weightHistory.length > 0 && (
-          <div className="rounded-2xl overflow-hidden"
-               style={{ border: '1px solid var(--fc-border)' }}>
-            {[...weightHistory].reverse().slice(0, 14).map((w, i) => {
-              const prev = [...weightHistory].reverse()[i + 1]
-              const delta = prev ? w.weight_lbs - prev.weight_lbs : null
+      {/* Daily summary */}
+      {dailySummary && (
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(255,255,255,0.3)', marginBottom: 10 }}>
+            Daily Summary
+          </div>
+          <SummaryCard summary={dailySummary} />
+        </div>
+      )}
+
+      {/* Macros */}
+      <div>
+        <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(255,255,255,0.3)', marginBottom: 10 }}>
+          Macros
+        </div>
+        <div style={{ ...cardStyle, padding: '20px 10px', display: 'flex', justifyContent: 'space-around' }}>
+          <MacroRing label="Protein" value={Math.round(totals.protein)} target={targets.protein} color={coach.color} trackColor={coach.ringTrack} size={80} />
+          <MacroRing label="Carbs" value={Math.round(totals.carbs)} target={targets.carbs} color="#FFB020" trackColor="rgba(255,176,32,0.12)" size={80} />
+          <MacroRing label="Fat" value={Math.round(totals.fat)} target={targets.fat} color="#8B5CF6" trackColor="rgba(139,92,246,0.12)" size={80} />
+        </div>
+      </div>
+
+      {/* Food log */}
+      <div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+          <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(255,255,255,0.3)' }}>
+            Food Log
+          </span>
+          <span style={{ fontFamily: 'var(--font-space-mono)', fontSize: 12, fontWeight: 700, color: coach.color }}>
+            {caloriesEaten} / {calorieTarget} kcal
+          </span>
+        </div>
+        {foodLog.length === 0 ? (
+          <div style={{ ...cardStyle, padding: '32px 20px', textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontSize: 14 }}>
+            Tell your coach what you had — I&apos;ll track it for you
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {foodLog.map((food, i) => {
+              const proteinRatio = food.protein / Math.max(food.protein + food.carbs + food.fat, 1)
+              const isHighProtein = proteinRatio > 0.3
               return (
-                <div key={w.id || w.logged_date}
-                     className="flex justify-between items-center px-3.5 py-2.5"
-                     style={{
-                       background: i % 2 === 0 ? 'var(--fc-surface2)' : 'var(--fc-surface)',
-                       borderBottom: i < Math.min(weightHistory.length, 14) - 1 ? '1px solid var(--fc-border)' : 'none',
-                     }}>
-                  <span className="text-xs" style={{ color: 'var(--fc-text-dim)' }}>
-                    {new Date(w.logged_date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
-                  </span>
-                  <div className="flex items-center gap-2">
-                    {delta !== null && (
-                      <span className="text-[11px]" style={{ color: delta < 0 ? 'var(--fc-success)' : delta > 0 ? 'var(--fc-danger)' : 'var(--fc-text-muted)' }}>
-                        {delta > 0 ? '+' : ''}{delta.toFixed(1)}
-                      </span>
-                    )}
-                    <span className="text-sm font-semibold" style={{ fontFamily: 'var(--font-jetbrains-mono)', color: 'var(--fc-text)' }}>
-                      {w.weight_lbs} lbs
-                    </span>
+                <div key={i} style={{
+                  ...cardStyle,
+                  borderLeft: isHighProtein ? '3px solid #3DDC84' : '3px solid rgba(255,255,255,0.06)',
+                  padding: '12px 16px',
+                  display: 'flex', alignItems: 'center', gap: 12,
+                  animation: 'fc-msg-in 0.5s ease both',
+                }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>{food.name}</div>
+                    <div style={{ display: 'flex', gap: 10, fontSize: 11 }}>
+                      <span style={{ color: isHighProtein ? '#3DDC84' : 'rgba(255,255,255,0.35)' }}>{food.protein}p</span>
+                      <span style={{ color: 'rgba(255,255,255,0.35)' }}>{food.carbs}c</span>
+                      <span style={{ color: 'rgba(255,255,255,0.35)' }}>{food.fat}f</span>
+                    </div>
                   </div>
+                  <div style={{ fontFamily: 'var(--font-space-mono)', fontWeight: 700, fontSize: 16, color: coach.color }}>
+                    {food.calories}
+                  </div>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)' }}>kcal</div>
                 </div>
               )
             })}
@@ -212,61 +258,25 @@ export function TodayTab({ foodLog, dailySummary, dinnerSuggestion, coach, calor
         )}
       </div>
 
-      {dailySummary && (
-        <div className="space-y-2">
-          <span className="text-[11px] font-bold uppercase tracking-widest" style={{ color: 'var(--fc-text-dim)' }}>
-            Daily Summary
-          </span>
-          <SummaryCard summary={dailySummary} />
-        </div>
-      )}
-
-      <div className="space-y-2">
-        <span className="text-[11px] font-bold uppercase tracking-widest" style={{ color: 'var(--fc-text-dim)' }}>
-          Macros
-        </span>
-        <div className="grid grid-cols-3 gap-2.5">
-          <MacroRing label="Protein" value={totals.protein} target={targets.protein} color={coach.color} />
-          <MacroRing label="Carbs" value={totals.carbs} target={targets.carbs} color={coach.color} />
-          <MacroRing label="Fat" value={totals.fat} target={targets.fat} color={coach.color} />
-        </div>
-      </div>
-
+      {/* Dinner suggestion */}
       {dinnerSuggestion && (
-        <div className="rounded-2xl p-4" style={{ background: 'var(--fc-surface2)', border: `1px solid ${coach.color}` }}>
-          <div className="text-[11px] font-bold uppercase tracking-widest mb-1.5"
-               style={{ color: coach.color }}>
-            🍽 Tonight&apos;s Suggestion
+        <div style={{
+          ...cardStyle,
+          background: `linear-gradient(135deg, ${coach.accentGlow} 0%, rgba(255,255,255,0.02) 100%)`,
+          border: `1px solid ${coach.color}22`,
+          padding: '16px 18px',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+            <span style={{ fontSize: 16 }}>🍽️</span>
+            <span style={{ fontWeight: 700, fontSize: 11, color: coach.color, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              Dinner Suggestion
+            </span>
           </div>
-          <p className="text-sm leading-relaxed">{dinnerSuggestion}</p>
+          <p style={{ fontSize: 14, lineHeight: 1.5, color: 'rgba(255,255,255,0.75)', margin: 0 }}>
+            {dinnerSuggestion}
+          </p>
         </div>
       )}
-
-      <div className="space-y-2">
-        <span className="text-[11px] font-bold uppercase tracking-widest" style={{ color: 'var(--fc-text-dim)' }}>
-          Food Log
-        </span>
-        {foodLog.length === 0 ? (
-          <div className="text-center py-6 text-sm" style={{ color: 'var(--fc-text-muted)' }}>
-            No foods logged yet — tell your coach what you ate!
-          </div>
-        ) : (
-          foodLog.map((food, i) => (
-            <div key={i} className="flex justify-between items-center px-3.5 py-3 rounded-xl animate-fc-fade-up"
-                 style={{ background: 'var(--fc-surface2)', border: '1px solid var(--fc-border)' }}>
-              <div>
-                <div className="text-sm font-semibold">{food.name}</div>
-                <div className="text-[11px] mt-0.5" style={{ color: 'var(--fc-text-dim)', fontFamily: 'var(--font-jetbrains-mono)' }}>
-                  {food.protein}p · {food.carbs}c · {food.fat}f
-                </div>
-              </div>
-              <span className="text-sm font-semibold" style={{ fontFamily: 'var(--font-jetbrains-mono)', color: coach.color }}>
-                {food.calories} kcal
-              </span>
-            </div>
-          ))
-        )}
-      </div>
     </div>
   )
 }

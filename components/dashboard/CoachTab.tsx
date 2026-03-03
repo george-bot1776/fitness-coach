@@ -1,14 +1,10 @@
 'use client'
 
 import { useRef, useState, useEffect } from 'react'
-import { Button } from '@/components/ui/button'
-import { Textarea } from '@/components/ui/textarea'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Input } from '@/components/ui/input'
 import { MessageBubble } from './MessageBubble'
 import type { Coach } from '@/types'
 
-interface Message { role: 'user' | 'coach'; text: string; imageUrl?: string; isLoading?: boolean }
+interface Message { role: 'user' | 'coach'; text: string; imageUrl?: string; isLoading?: boolean; isError?: boolean }
 
 interface Props {
   coach: Coach
@@ -17,55 +13,43 @@ interface Props {
   onActivityLog: (text: string) => void
 }
 
-const CHIPS = ['Had breakfast', 'Just worked out', 'Should I eat this?', 'Daily summary', 'How am I doing?']
-
-const ACTIVITY_TYPES = [
-  { value: 'running', label: '🏃 Running', unit: 'minutes' },
-  { value: 'walking', label: '🚶 Walking', unit: 'minutes' },
-  { value: 'cycling', label: '🚴 Cycling', unit: 'minutes' },
-  { value: 'swimming', label: '🏊 Swimming', unit: 'minutes' },
-  { value: 'hiit', label: '🔥 HIIT', unit: 'minutes' },
-  { value: 'weightlifting', label: '🏋️ Weightlifting', unit: 'minutes' },
-  { value: 'yoga', label: '🧘 Yoga', unit: 'minutes' },
-  { value: 'steps', label: '👟 Steps', unit: 'steps' },
+const CHIPS = [
+  { label: 'Had breakfast', icon: '🍳' },
+  { label: 'Just worked out', icon: '💪' },
+  { label: 'Should I eat this?', icon: '🤔' },
+  { label: 'Daily summary', icon: '📊' },
+  { label: 'How am I doing?', icon: '📈' },
 ]
 
-export function CoachTab({ coach, messages, onSend, onActivityLog }: Props) {
+export function CoachTab({ coach, messages, onSend }: Props) {
   const [text, setText] = useState('')
   const [pendingImage, setPendingImage] = useState<{ base64: string; mediaType: string; previewUrl: string } | null>(null)
-  const [showActivity, setShowActivity] = useState(false)
-  const [actType, setActType] = useState('running')
-  const [actAmount, setActAmount] = useState('')
   const feedRef = useRef<HTMLDivElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const textareaRef = useRef<HTMLInputElement>(null)
 
-  // Auto-scroll to bottom on new messages (only if user was near bottom)
+  // Auto-scroll to bottom
   useEffect(() => {
     if (feedRef.current) {
       const { scrollTop, scrollHeight, clientHeight } = feedRef.current
-      const isNearBottom = scrollHeight - scrollTop - clientHeight < 100
+      const isNearBottom = scrollHeight - scrollTop - clientHeight < 120
       if (isNearBottom) {
         feedRef.current.scrollTo({ top: feedRef.current.scrollHeight, behavior: 'smooth' })
       }
     }
   }, [messages])
 
-  // Handle mobile keyboard - keep input visible
+  // Mobile keyboard handler
   useEffect(() => {
     const handleVisualViewportChange = () => {
       if (feedRef.current) {
         const viewportHeight = window.visualViewport?.height || window.innerHeight
         const offset = window.innerHeight - viewportHeight
         if (offset > 0) {
-          // Keyboard is open - scroll input into view
-          setTimeout(() => {
-            textareaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-          }, 100)
+          setTimeout(() => textareaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100)
         }
       }
     }
-
     window.visualViewport?.addEventListener('resize', handleVisualViewportChange)
     return () => window.visualViewport?.removeEventListener('resize', handleVisualViewportChange)
   }, [])
@@ -76,7 +60,6 @@ export function CoachTab({ coach, messages, onSend, onActivityLog }: Props) {
     onSend(t, pendingImage ?? undefined)
     setText('')
     setPendingImage(null)
-    if (textareaRef.current) textareaRef.current.style.height = 'auto'
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
@@ -89,7 +72,6 @@ export function CoachTab({ coach, messages, onSend, onActivityLog }: Props) {
     const reader = new FileReader()
     reader.onload = ev => {
       const dataUrl = ev.target?.result as string
-      // Compress image to stay well under Vercel's 4.5MB body limit
       const img = new Image()
       img.onload = () => {
         const MAX = 1024
@@ -108,18 +90,10 @@ export function CoachTab({ coach, messages, onSend, onActivityLog }: Props) {
     e.target.value = ''
   }
 
-  function handleActivityLog() {
-    if (!actAmount) return
-    const type = ACTIVITY_TYPES.find(t => t.value === actType)!
-    onActivityLog(`I just did ${actAmount} ${type.unit} of ${actType}`)
-    setActAmount('')
-    setShowActivity(false)
-  }
-
   return (
-    <div className="flex flex-col flex-1 overflow-hidden">
-      {/* Feed */}
-      <div ref={feedRef} className="flex-1 overflow-y-auto p-4 space-y-2.5">
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
+      {/* Message feed */}
+      <div ref={feedRef} style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 8px', display: 'flex', flexDirection: 'column', gap: 8 }}>
         {messages.map((msg, i) => (
           <MessageBubble
             key={i}
@@ -127,6 +101,7 @@ export function CoachTab({ coach, messages, onSend, onActivityLog }: Props) {
             text={msg.text}
             imageUrl={msg.imageUrl}
             isLoading={msg.isLoading}
+            isError={msg.isError}
             coach={coach}
           />
         ))}
@@ -134,95 +109,114 @@ export function CoachTab({ coach, messages, onSend, onActivityLog }: Props) {
 
       {/* Image preview */}
       {pendingImage && (
-        <div className="flex items-center gap-3 px-4 py-2.5"
-             style={{ background: 'var(--fc-surface2)', borderTop: '1px solid var(--fc-border)' }}>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 12,
+          padding: '10px 16px',
+          background: 'rgba(255,255,255,0.04)',
+          borderTop: '1px solid rgba(255,255,255,0.06)',
+        }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={pendingImage.previewUrl} alt="preview" className="w-12 h-12 rounded-lg object-cover" />
-          <span className="text-xs flex-1" style={{ color: 'var(--fc-text-dim)' }}>📸 Photo ready to send</span>
-          <button onClick={() => setPendingImage(null)} className="text-lg" style={{ color: 'var(--fc-text-dim)' }}>✕</button>
-        </div>
-      )}
-
-      {/* Activity modal */}
-      {showActivity && (
-        <div className="px-4 py-3 space-y-2.5 animate-fc-fade-up"
-             style={{ background: 'var(--fc-surface2)', borderTop: '1px solid var(--fc-border)' }}>
-          <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--fc-text-dim)' }}>
-            Log Activity
-          </p>
-          <div className="flex gap-2">
-            <Select value={actType} onValueChange={setActType}>
-              <SelectTrigger className="flex-1" style={{ background: 'var(--fc-surface3)', border: '1px solid var(--fc-border)', color: 'var(--fc-text)' }}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent style={{ background: 'var(--fc-surface2)', border: '1px solid var(--fc-border)' }}>
-                {ACTIVITY_TYPES.map(t => (
-                  <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Input type="number" placeholder="30" value={actAmount} onChange={e => setActAmount(e.target.value)}
-                   className="w-20" style={{ background: 'var(--fc-surface3)', border: '1px solid var(--fc-border)', color: 'var(--fc-text)' }} />
-            <Button onClick={handleActivityLog} style={{ background: 'var(--fc-coach-accent)', color: '#000' }}>
-              Log
-            </Button>
-          </div>
+          <img src={pendingImage.previewUrl} alt="preview" style={{ width: 44, height: 44, borderRadius: 10, objectFit: 'cover' }} />
+          <span style={{ flex: 1, fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>📸 Photo ready to send</span>
+          <button onClick={() => setPendingImage(null)} style={{ fontSize: 18, color: 'rgba(255,255,255,0.4)', background: 'none', border: 'none', cursor: 'pointer' }}>✕</button>
         </div>
       )}
 
       {/* Quick chips */}
-      <div className="flex gap-2 px-4 py-2 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+      <div style={{ padding: '8px 16px', display: 'flex', gap: 8, overflowX: 'auto' }}>
         {CHIPS.map(chip => (
           <button
-            key={chip}
-            onClick={() => { setText(chip); setTimeout(handleSend, 0) }}
-            className="shrink-0 rounded-full px-3 py-1.5 text-xs transition-colors"
-            style={{ background: 'var(--fc-surface2)', border: '1px solid var(--fc-border)', color: 'var(--fc-text-dim)', whiteSpace: 'nowrap' }}
+            key={chip.label}
+            onClick={() => { setText(chip.label); setTimeout(handleSend, 0) }}
+            style={{
+              padding: '8px 14px',
+              borderRadius: 20,
+              background: 'rgba(255,255,255,0.04)',
+              border: '1px solid rgba(255,255,255,0.08)',
+              color: 'rgba(255,255,255,0.55)',
+              fontSize: 12,
+              fontFamily: 'var(--font-dm-sans)',
+              fontWeight: 500,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              flexShrink: 0,
+            }}
           >
-            {chip}
+            <span>{chip.icon}</span> {chip.label}
           </button>
         ))}
       </div>
 
       {/* Input bar */}
-      <div className="flex items-end gap-2 px-3 pb-4 pt-2"
-           style={{ background: 'var(--fc-surface)', borderTop: '1px solid var(--fc-border)' }}>
-        <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelect} />
+      <div style={{
+        padding: '12px 16px 20px',
+        borderTop: '1px solid rgba(255,255,255,0.04)',
+        display: 'flex', alignItems: 'center', gap: 10,
+        background: 'var(--fc-bg)',
+      }}>
+        <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleFileSelect} />
+
+        {/* Camera button */}
         <button
           onClick={() => fileRef.current?.click()}
-          className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition-colors"
-          style={{ background: 'var(--fc-surface2)', border: '1px solid var(--fc-border)', color: 'var(--fc-text-dim)' }}
-        >
-          📸
-        </button>
-        <button
-          onClick={() => setShowActivity(v => !v)}
-          className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition-colors"
-          style={{ background: 'var(--fc-surface2)', border: '1px solid var(--fc-border)', color: 'var(--fc-text-dim)' }}
-        >
-          🏃
-        </button>
-        <Textarea
-          ref={textareaRef}
-          value={text}
-          onChange={e => {
-            setText(e.target.value)
-            e.target.style.height = 'auto'
-            e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px'
+          style={{
+            width: 38, height: 38, borderRadius: 12, flexShrink: 0,
+            background: 'rgba(255,255,255,0.04)',
+            border: '1px solid rgba(255,255,255,0.08)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 16, cursor: 'pointer', color: 'rgba(255,255,255,0.4)',
           }}
-          onKeyDown={handleKeyDown}
-          placeholder="Tell your coach what you ate, did, or ask anything…"
-          rows={1}
-          className="flex-1 resize-none text-sm"
-          style={{ background: 'var(--fc-surface2)', border: '1px solid var(--fc-border)', color: 'var(--fc-text)', borderRadius: '20px', padding: '10px 16px', minHeight: '38px', maxHeight: '120px', lineHeight: '1.4' }}
-        />
+        >
+          📷
+        </button>
+
+        {/* Text input */}
+        <div style={{
+          flex: 1, display: 'flex', alignItems: 'center',
+          background: 'rgba(255,255,255,0.04)',
+          border: '1px solid rgba(255,255,255,0.08)',
+          borderRadius: 14,
+          padding: '0 14px',
+        }}>
+          <input
+            ref={textareaRef}
+            value={text}
+            onChange={e => setText(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Tell your coach what you ate, did, or ask anything…"
+            style={{
+              flex: 1,
+              padding: '12px 0',
+              background: 'none',
+              border: 'none',
+              outline: 'none',
+              color: '#F1F1F1',
+              fontSize: 13,
+              fontFamily: 'var(--font-dm-sans)',
+            }}
+          />
+        </div>
+
+        {/* Send button */}
         <button
           onClick={handleSend}
-          className="w-9 h-9 rounded-full flex items-center justify-center shrink-0"
-          style={{ background: 'var(--fc-coach-accent)', color: '#000', border: 'none' }}
+          onMouseDown={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(0.95)' }}
+          onMouseUp={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1)' }}
+          style={{
+            width: 40, height: 40, borderRadius: 14, flexShrink: 0,
+            background: coach.gradient,
+            border: 'none',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer',
+            transition: 'transform 0.15s ease',
+          }}
         >
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-            <path d="M14 8L2 2l2.5 6L2 14l12-6z" fill="currentColor"/>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+            <path d="M22 2L11 13" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </button>
       </div>

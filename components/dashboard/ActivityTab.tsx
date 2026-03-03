@@ -1,29 +1,30 @@
 'use client'
 
 import { useState } from 'react'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import type { ActivityItem } from '@/types'
+import type { ActivityItem, Coach } from '@/types'
 
 const ACTIVITY_TYPES = [
-  { value: 'running', label: '🏃 Running', unit: 'minutes' },
-  { value: 'walking', label: '🚶 Walking', unit: 'minutes' },
-  { value: 'cycling', label: '🚴 Cycling', unit: 'minutes' },
-  { value: 'swimming', label: '🏊 Swimming', unit: 'minutes' },
-  { value: 'hiit', label: '🔥 HIIT', unit: 'minutes' },
-  { value: 'weightlifting', label: '🏋️ Weightlifting', unit: 'minutes' },
-  { value: 'yoga', label: '🧘 Yoga', unit: 'minutes' },
-  { value: 'steps', label: '👟 Steps', unit: 'steps' },
+  { value: 'running',      label: '🏃 Running',      unit: 'minutes', icon: '🏃' },
+  { value: 'walking',      label: '🚶 Walking',      unit: 'minutes', icon: '🚶' },
+  { value: 'cycling',      label: '🚴 Cycling',      unit: 'minutes', icon: '🚴' },
+  { value: 'swimming',     label: '🏊 Swimming',     unit: 'minutes', icon: '🏊' },
+  { value: 'hiit',         label: '🔥 HIIT',         unit: 'minutes', icon: '🔥' },
+  { value: 'weightlifting',label: '🏋️ Weightlifting',unit: 'minutes', icon: '🏋️' },
+  { value: 'yoga',         label: '🧘 Yoga',         unit: 'minutes', icon: '🧘' },
+  { value: 'steps',        label: '👟 Steps',        unit: 'steps',   icon: '👟' },
 ]
+
+const BURN_TARGET = 800
 
 interface Props {
   activityLog: ActivityItem[]
   caloriesBurned: number
   onLogActivity: (text: string) => void
+  coach: Coach
 }
 
-export function ActivityTab({ activityLog, caloriesBurned, onLogActivity }: Props) {
+export function ActivityTab({ activityLog, caloriesBurned, onLogActivity, coach }: Props) {
   const [showForm, setShowForm] = useState(false)
   const [actType, setActType] = useState('running')
   const [amount, setAmount] = useState('')
@@ -36,89 +37,205 @@ export function ActivityTab({ activityLog, caloriesBurned, onLogActivity }: Prop
     setShowForm(false)
   }
 
+  const burnPct = Math.min(1, caloriesBurned / BURN_TARGET)
+  const burnRemaining = BURN_TARGET - caloriesBurned
+
   return (
-    <div className="flex-1 overflow-y-auto p-4 space-y-4">
-      {/* Stats */}
-      <div className="grid grid-cols-3 gap-2.5">
+    <div style={{ flex: 1, overflowY: 'auto', padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+      {/* Burn target card */}
+      <div style={{
+        background: 'rgba(255,255,255,0.04)',
+        border: '1px solid rgba(255,255,255,0.06)',
+        borderRadius: 16,
+        padding: '24px 20px',
+        textAlign: 'center',
+        animation: 'fc-fade-up 0.5s ease both',
+      }}>
+        <div style={{ marginBottom: 12 }}>
+          <span style={{ fontFamily: 'var(--font-space-mono)', fontWeight: 700, fontSize: 42, color: coach.color, lineHeight: 1 }}>
+            {caloriesBurned}
+          </span>
+          <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.35)', marginLeft: 6 }}>
+            / {BURN_TARGET} kcal
+          </span>
+        </div>
+        <div style={{ height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.06)', overflow: 'hidden', marginBottom: 10 }}>
+          <div style={{
+            height: '100%',
+            width: `${burnPct * 100}%`,
+            borderRadius: 3,
+            background: coach.gradient,
+            transition: 'width 1s ease',
+          }} />
+        </div>
+        <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)' }}>
+          {burnPct >= 1 ? '🔥 Daily burn goal crushed!' : `${burnRemaining} kcal to daily burn goal`}
+        </span>
+      </div>
+
+      {/* Stats row */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
         {[
-          { val: caloriesBurned, key: 'kcal burned' },
-          { val: caloriesBurned, key: 'kcal earned' },
-          { val: activityLog.length, key: 'activities' },
-        ].map((s, i) => (
-          <div key={i} className="rounded-2xl p-3.5 text-center"
-               style={{ background: 'var(--fc-surface2)', border: '1px solid var(--fc-border)' }}>
-            <span className="block text-xl font-semibold"
-                  style={{ fontFamily: 'var(--font-jetbrains-mono)', color: 'var(--fc-coach-accent)' }}>
-              {s.val}
-            </span>
-            <span className="text-[11px] uppercase tracking-wide" style={{ color: 'var(--fc-text-dim)' }}>
-              {s.key}
-            </span>
+          { value: caloriesBurned, label: 'Burned' },
+          { value: caloriesBurned, label: 'Earned Back' },
+          { value: activityLog.length, label: 'Activities' },
+        ].map((stat, i) => (
+          <div key={i} style={{
+            background: 'rgba(255,255,255,0.04)',
+            border: '1px solid rgba(255,255,255,0.06)',
+            borderRadius: 16,
+            padding: '14px 10px',
+            textAlign: 'center',
+          }}>
+            <div style={{ fontFamily: 'var(--font-space-mono)', fontWeight: 700, fontSize: 22, color: coach.color, marginBottom: 4, lineHeight: 1 }}>
+              {stat.value}
+            </div>
+            <div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(255,255,255,0.3)' }}>
+              {stat.label}
+            </div>
           </div>
         ))}
       </div>
 
-      <Button
-        variant="outline"
-        className="w-full font-semibold"
+      {/* Log button */}
+      <button
         onClick={() => setShowForm(v => !v)}
-        style={{ borderColor: 'var(--fc-coach-accent)', color: 'var(--fc-coach-accent)', background: 'transparent' }}
+        style={{
+          width: '100%',
+          padding: 14,
+          borderRadius: 14,
+          background: showForm ? coach.accentGlow : 'transparent',
+          border: `1.5px solid ${coach.color}`,
+          color: coach.color,
+          fontFamily: 'var(--font-dm-sans)',
+          fontWeight: 700,
+          fontSize: 14,
+          cursor: 'pointer',
+          transition: 'background 0.15s ease',
+        }}
       >
-        + Log Activity
-      </Button>
+        {showForm ? '✕ Cancel' : '+ Log Activity'}
+      </button>
 
+      {/* Log form */}
       {showForm && (
-        <div className="rounded-2xl p-4 space-y-3 animate-fc-fade-up"
-             style={{ background: 'var(--fc-surface2)', border: '1px solid var(--fc-border)' }}>
+        <div style={{
+          background: 'rgba(255,255,255,0.04)',
+          border: '1px solid rgba(255,255,255,0.06)',
+          borderRadius: 16,
+          padding: 16,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 12,
+          animation: 'fc-fade-up 0.3s ease both',
+        }}>
           <Select value={actType} onValueChange={setActType}>
-            <SelectTrigger style={{ background: 'var(--fc-surface3)', border: '1px solid var(--fc-border)', color: 'var(--fc-text)' }}>
+            <SelectTrigger style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: '#F1F1F1', borderRadius: 10 }}>
               <SelectValue />
             </SelectTrigger>
-            <SelectContent style={{ background: 'var(--fc-surface2)', border: '1px solid var(--fc-border)' }}>
+            <SelectContent style={{ background: '#1a1c22', border: '1px solid rgba(255,255,255,0.08)' }}>
               {ACTIVITY_TYPES.map(t => (
                 <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
               ))}
             </SelectContent>
           </Select>
-          <div className="flex gap-2">
-            <Input
+          <div style={{ display: 'flex', gap: 10 }}>
+            <input
               type="number"
               placeholder="30"
               value={amount}
               onChange={e => setAmount(e.target.value)}
-              className="flex-1"
-              style={{ background: 'var(--fc-surface3)', border: '1px solid var(--fc-border)', color: 'var(--fc-text)' }}
+              onKeyDown={e => e.key === 'Enter' && handleLog()}
+              style={{
+                flex: 1,
+                background: 'rgba(255,255,255,0.06)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                borderRadius: 10,
+                padding: '10px 14px',
+                color: '#F1F1F1',
+                fontSize: 14,
+                fontFamily: 'var(--font-dm-sans)',
+                outline: 'none',
+              }}
             />
-            <Button onClick={handleLog} style={{ background: 'var(--fc-coach-accent)', color: '#000' }}>
+            <button
+              onClick={handleLog}
+              style={{
+                padding: '10px 20px',
+                borderRadius: 10,
+                background: coach.gradient,
+                border: 'none',
+                color: '#fff',
+                fontFamily: 'var(--font-dm-sans)',
+                fontWeight: 700,
+                fontSize: 14,
+                cursor: 'pointer',
+              }}
+            >
               Log
-            </Button>
+            </button>
           </div>
         </div>
       )}
 
-      <div className="space-y-2">
-        <span className="text-[11px] font-bold uppercase tracking-widest" style={{ color: 'var(--fc-text-dim)' }}>
-          Activity Log
-        </span>
+      {/* Activity log */}
+      <div>
+        <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(255,255,255,0.3)', marginBottom: 10 }}>
+          Today&apos;s Activities
+        </div>
         {activityLog.length === 0 ? (
-          <div className="text-center py-6 text-sm" style={{ color: 'var(--fc-text-muted)' }}>
-            No activities logged yet
+          <div style={{
+            background: 'rgba(255,255,255,0.04)',
+            border: '1px solid rgba(255,255,255,0.06)',
+            borderRadius: 16,
+            padding: '32px 20px',
+            textAlign: 'center',
+            color: 'rgba(255,255,255,0.3)',
+            fontSize: 14,
+          }}>
+            No movement yet today — even a 10-min walk counts 🔥
           </div>
         ) : (
-          activityLog.map((act, i) => (
-            <div key={i} className="flex justify-between items-center px-3.5 py-3 rounded-xl animate-fc-fade-up"
-                 style={{ background: 'var(--fc-surface2)', border: '1px solid var(--fc-border)' }}>
-              <div>
-                <div className="text-sm font-semibold">{act.label}</div>
-                <div className="text-xs mt-0.5" style={{ color: 'var(--fc-text-dim)', fontFamily: 'var(--font-jetbrains-mono)' }}>
-                  {act.value} {act.unit}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {activityLog.map((act, i) => {
+              const typeInfo = ACTIVITY_TYPES.find(t => act.label.toLowerCase().includes(t.value)) ?? ACTIVITY_TYPES[0]
+              return (
+                <div key={i} style={{
+                  background: 'rgba(255,255,255,0.04)',
+                  border: '1px solid rgba(255,255,255,0.06)',
+                  borderRadius: 16,
+                  borderLeft: `3px solid ${coach.color}`,
+                  padding: '14px 16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 14,
+                  animation: 'fc-msg-in 0.5s ease both',
+                }}>
+                  <div style={{
+                    width: 44, height: 44, borderRadius: 12,
+                    background: coach.accentGlow,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 20, flexShrink: 0,
+                  }}>
+                    {typeInfo.icon}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 2 }}>{act.label}</div>
+                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>
+                      {act.value} {act.unit}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontFamily: 'var(--font-space-mono)', fontWeight: 700, fontSize: 16, color: '#3DDC84' }}>
+                      +{act.caloriesBurned}
+                    </div>
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>kcal</div>
+                  </div>
                 </div>
-              </div>
-              <span className="text-sm font-semibold" style={{ fontFamily: 'var(--font-jetbrains-mono)', color: 'var(--fc-success)' }}>
-                +{act.caloriesBurned} kcal
-              </span>
-            </div>
-          ))
+              )
+            })}
+          </div>
         )}
       </div>
     </div>

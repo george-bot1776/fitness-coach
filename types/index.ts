@@ -71,7 +71,11 @@ export interface Coach {
   name: string
   title: string
   emoji: string
-  color: string
+  color: string        // primary accent (used throughout)
+  accentGlow: string  // accent at 15% opacity for glows
+  gradient: string    // 135deg two-stop gradient string
+  headerGradient: string // subtle header background gradient
+  ringTrack: string   // macro ring track color (accent at 12%)
   tagline: string
   modeLabel: string
   personality: string

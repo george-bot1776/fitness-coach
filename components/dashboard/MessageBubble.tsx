@@ -1,4 +1,3 @@
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import type { Coach } from '@/types'
 
 interface Props {
@@ -11,41 +10,69 @@ interface Props {
 }
 
 export function MessageBubble({ role, text, imageUrl, isError, isLoading, coach }: Props) {
+  if (role === 'coach') {
+    return (
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, maxWidth: '88%', alignSelf: 'flex-start' }}
+           className="animate-fc-msg-in">
+        {/* Coach avatar */}
+        <div style={{
+          width: 28, height: 28, borderRadius: 10,
+          background: 'rgba(255,255,255,0.05)',
+          border: '1px solid rgba(255,255,255,0.08)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 14, flexShrink: 0,
+        }}>
+          {coach.emoji}
+        </div>
+        <div style={{
+          padding: '12px 16px',
+          borderRadius: '18px 18px 18px 4px',
+          background: isError
+            ? 'rgba(255,68,68,0.1)'
+            : 'linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.03) 100%)',
+          border: `1px solid ${isError ? 'rgba(255,68,68,0.3)' : 'rgba(255,255,255,0.06)'}`,
+          fontSize: 14,
+          lineHeight: 1.55,
+          color: 'rgba(255,255,255,0.85)',
+          fontFamily: 'var(--font-dm-sans)',
+        }}>
+          {imageUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={imageUrl} alt="food" style={{ borderRadius: 8, marginBottom: 8, maxWidth: 180, display: 'block' }} />
+          )}
+          {isLoading ? (
+            <span style={{ display: 'flex', gap: 4, alignItems: 'center', padding: '2px 0' }}>
+              <span className="typing-dot" style={{ background: coach.color }} />
+              <span className="typing-dot" style={{ background: coach.color }} />
+              <span className="typing-dot" style={{ background: coach.color }} />
+            </span>
+          ) : (
+            <p style={{ margin: 0 }}>{text}</p>
+          )}
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className={`flex items-end gap-2 animate-fc-msg-in ${role === 'user' ? 'flex-row-reverse' : ''}`}>
-      {role === 'coach' && (
-        <Avatar className="w-8 h-8 shrink-0" style={{ background: 'var(--fc-surface3)' }}>
-          <AvatarFallback style={{ background: 'var(--fc-surface3)', fontSize: '16px' }}>
-            {coach.emoji}
-          </AvatarFallback>
-        </Avatar>
-      )}
-      <div
-        className="max-w-[78%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed"
-        style={
-          role === 'user'
-            ? { background: coach.color, color: '#000', borderBottomRightRadius: '4px', fontWeight: 500 }
-            : {
-                background: isError ? 'rgba(239,68,68,0.12)' : 'var(--fc-surface2)',
-                border: `1px solid ${isError ? 'rgba(239,68,68,0.3)' : 'var(--fc-border)'}`,
-                borderBottomLeftRadius: '4px',
-                color: 'var(--fc-text)',
-              }
-        }
-      >
+    <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'flex-end', maxWidth: '88%', alignSelf: 'flex-end' }}
+         className="animate-fc-msg-in">
+      <div style={{
+        padding: '12px 16px',
+        borderRadius: '18px 18px 4px 18px',
+        background: 'rgba(255,255,255,0.08)',
+        border: '1px solid rgba(255,255,255,0.08)',
+        fontSize: 14,
+        lineHeight: 1.55,
+        color: '#F1F1F1',
+        fontFamily: 'var(--font-dm-sans)',
+        fontWeight: 500,
+      }}>
         {imageUrl && (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={imageUrl} alt="food" className="rounded-lg mb-2 max-w-[180px]" />
+          <img src={imageUrl} alt="food" style={{ borderRadius: 8, marginBottom: 8, maxWidth: 180, display: 'block' }} />
         )}
-        {isLoading ? (
-          <span className="flex gap-1.5 items-center py-0.5">
-            <span className="dot-pulse" />
-            <span className="dot-pulse" />
-            <span className="dot-pulse" />
-          </span>
-        ) : (
-          <p>{text}</p>
-        )}
+        <p style={{ margin: 0 }}>{text}</p>
       </div>
     </div>
   )

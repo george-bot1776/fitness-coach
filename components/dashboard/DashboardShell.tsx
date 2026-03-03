@@ -10,7 +10,6 @@ import { Header } from './Header'
 import { CoachTab } from './CoachTab'
 import { ActivityTab } from './ActivityTab'
 import { TodayTab } from './TodayTab'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import type { Profile, FoodLog, ActivityLog, ChatMessage, CoachResponseType, FoodItem, ActivityItem, DailySummary, WeightLog } from '@/types'
 
 interface Props {
@@ -27,11 +26,14 @@ interface DisplayMessage {
   text: string
   imageUrl?: string
   isLoading?: boolean
+  isError?: boolean
 }
 
 export function DashboardShell({ profile, userId, initialFoodLogs, initialActivityLogs, initialWeightLbs, initialWeightHistory }: Props) {
   const router = useRouter()
   const coach = COACHES[profile.coach_id] ?? COACHES.aria
+
+  const [activeTab, setActiveTab] = useState('coach')
 
   // Session state
   const [apiMessages, setApiMessages] = useState<ChatMessage[]>([])
@@ -54,7 +56,8 @@ export function DashboardShell({ profile, userId, initialFoodLogs, initialActivi
   // Apply coach accent CSS variable
   useEffect(() => {
     document.documentElement.style.setProperty('--fc-coach-accent', coach.color)
-  }, [coach.color])
+    document.documentElement.style.setProperty('--fc-coach-gradient', coach.gradient)
+  }, [coach.color, coach.gradient])
 
   // Session summarization on unload
   useEffect(() => {
@@ -99,11 +102,8 @@ export function DashboardShell({ profile, userId, initialFoodLogs, initialActivi
       setDisplayMessages(prev => [...prev, { role: 'user', text, imageUrl: image?.previewUrl }])
     }
 
-    // Loading indicator
-    const loadingId = Date.now()
     setDisplayMessages(prev => [...prev, { role: 'coach', text: '', isLoading: true }])
 
-    // Build content
     const content: ChatMessage['content'] = []
     if (image) {
       content.push({ type: 'image', source: { type: 'base64', media_type: image.mediaType, data: image.base64 } })
@@ -117,8 +117,6 @@ export function DashboardShell({ profile, userId, initialFoodLogs, initialActivi
 
     const updatedMessages = [...apiMessages, userMessage]
 
-    // Strip image data from older messages to keep history lightweight
-    // Only the most recent image message needs the actual bytes
     const trimmedMessages = updatedMessages.map((msg, idx) => {
       if (idx === updatedMessages.length - 1) return msg
       if (typeof msg.content === 'string') return msg
@@ -148,18 +146,16 @@ export function DashboardShell({ profile, userId, initialFoodLogs, initialActivi
         body: JSON.stringify({ messages: trimmedMessages, system }),
       })
 
-      // Remove loading bubble
-      setDisplayMessages(prev => prev.filter((_, i) => i !== prev.length - 1 || !prev[prev.length-1]?.isLoading))
+      setDisplayMessages(prev => prev.filter((_, i) => i !== prev.length - 1 || !prev[prev.length - 1]?.isLoading))
 
       if (!res.ok) {
-        setDisplayMessages(prev => [...prev.filter(m => !m.isLoading), { role: 'coach', text: 'Something went wrong. Please try again.', isError: true } as DisplayMessage])
+        setDisplayMessages(prev => [...prev.filter(m => !m.isLoading), { role: 'coach', text: 'Something went wrong. Please try again.', isError: true }])
         setIsLoading(false)
         return
       }
 
       const data = await res.json()
 
-      // Handle blocked
       if (data.blocked) {
         setDisplayMessages(prev => [...prev.filter(m => !m.isLoading), { role: 'coach', text: data.message }])
         setApiMessages(prev => [...prev, { role: 'assistant', content: data.message }])
@@ -185,8 +181,6 @@ export function DashboardShell({ profile, userId, initialFoodLogs, initialActivi
     } finally {
       setIsLoading(false)
     }
-
-    void loadingId
   }
 
   async function handleCoachResponse(parsed: CoachResponseType) {
@@ -243,48 +237,34 @@ export function DashboardShell({ profile, userId, initialFoodLogs, initialActivi
   }
 
   return (
-    <div className="flex flex-col max-w-[430px] mx-auto overflow-hidden fc-shell"
-         style={{ background: 'var(--fc-bg)' }}>
+    <div className="fc-shell" style={{ maxWidth: 430, margin: '0 auto', background: 'var(--fc-bg)', display: 'flex', flexDirection: 'column', overflow: 'hidden', fontFamily: 'var(--font-dm-sans)' }}>
       <Header
         coach={coach}
         caloriesEaten={caloriesEaten}
         caloriesBurned={caloriesBurned}
         calorieTarget={profile.calorie_target}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
       />
 
-      <Tabs defaultValue="coach" className="flex flex-col flex-1 overflow-hidden">
-        <TabsList className="rounded-none border-b shrink-0 h-10 gap-0 p-0"
-                  style={{ background: 'var(--fc-surface)', borderColor: 'var(--fc-border)' }}>
-          {['coach', 'activity', 'today'].map(tab => (
-            <TabsTrigger
-              key={tab}
-              value={tab}
-              className="flex-1 rounded-none text-xs font-semibold capitalize h-full data-[state=active]:shadow-none"
-              style={{ color: 'var(--fc-text-dim)' }}
-            >
-              {tab === 'coach' ? 'Coach' : tab === 'activity' ? 'Activity' : 'Today'}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-
-        <TabsContent value="coach" className="flex flex-col flex-1 overflow-hidden mt-0">
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
+        {activeTab === 'coach' && (
           <CoachTab
             coach={coach}
             messages={displayMessages}
             onSend={(text, image) => sendMessage(text, true, image)}
             onActivityLog={handleLogActivity}
           />
-        </TabsContent>
-
-        <TabsContent value="activity" className="flex flex-col flex-1 overflow-hidden mt-0">
+        )}
+        {activeTab === 'activity' && (
           <ActivityTab
             activityLog={activityLog}
             caloriesBurned={caloriesBurned}
             onLogActivity={handleLogActivity}
+            coach={coach}
           />
-        </TabsContent>
-
-        <TabsContent value="today" className="flex flex-col flex-1 overflow-hidden mt-0">
+        )}
+        {activeTab === 'today' && (
           <TodayTab
             foodLog={foodLog}
             dailySummary={dailySummary}
@@ -303,12 +283,14 @@ export function DashboardShell({ profile, userId, initialFoodLogs, initialActivi
               })
             }}
           />
-        </TabsContent>
-      </Tabs>
+        )}
+      </div>
 
-      {/* Sign out — accessible from bottom of coach tab via long-press not needed, but added as tiny link */}
-      <div className="shrink-0 text-center pb-1" style={{ background: 'var(--fc-bg)' }}>
-        <button onClick={handleSignOut} className="text-[10px]" style={{ color: 'var(--fc-text-muted)' }}>
+      <div style={{ flexShrink: 0, textAlign: 'center', paddingBottom: 8, background: 'var(--fc-bg)' }}>
+        <button
+          onClick={handleSignOut}
+          style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-dm-sans)' }}
+        >
           sign out
         </button>
       </div>

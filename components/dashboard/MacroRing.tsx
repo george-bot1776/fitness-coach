@@ -1,42 +1,67 @@
 'use client'
 
+import { useState, useEffect } from 'react'
+
 interface Props {
   label: string
   value: number
   target: number
   color: string
+  trackColor: string
+  size?: number
+  strokeWidth?: number
 }
 
-export function MacroRing({ label, value, target, color }: Props) {
-  const pct = target > 0 ? Math.min(100, (value / target) * 100) : 0
-  const circumference = 2 * Math.PI * 28
-  const offset = circumference - (pct / 100) * circumference
+export function MacroRing({ label, value, target, color, trackColor, size = 80, strokeWidth = 5 }: Props) {
+  const [progress, setProgress] = useState(0)
+  const pct = target > 0 ? Math.min(1, value / target) : 0
+  const radius = (size - strokeWidth * 2) / 2
+  const circumference = 2 * Math.PI * radius
+
+  useEffect(() => {
+    const timer = setTimeout(() => setProgress(pct), 120)
+    return () => clearTimeout(timer)
+  }, [pct])
+
+  const offset = circumference - progress * circumference
+  const pctDisplay = Math.round(pct * 100)
 
   return (
-    <div className="flex flex-col items-center gap-1.5 rounded-2xl py-3.5 px-2"
-         style={{ background: 'var(--fc-surface2)', border: '1px solid var(--fc-border)' }}>
-      <span className="text-xs uppercase tracking-widest font-semibold"
-            style={{ color: 'var(--fc-text-dim)', fontSize: '11px' }}>
-        {label}
-      </span>
-      <div className="relative w-[68px] h-[68px]">
-        <svg className="w-full h-full" viewBox="0 0 68 68" style={{ transform: 'rotate(-90deg)' }}>
-          <circle className="ring-track" cx="34" cy="34" r="28" />
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+      {/* Ring */}
+      <div style={{ position: 'relative', width: size, height: size }}>
+        <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
+          <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke={trackColor} strokeWidth={strokeWidth} />
           <circle
-            className="ring-fill"
-            cx="34" cy="34" r="28"
-            style={{ stroke: color, strokeDashoffset: offset }}
+            cx={size / 2} cy={size / 2} r={radius}
+            fill="none"
+            stroke={color}
+            strokeWidth={strokeWidth}
+            strokeDasharray={circumference}
+            strokeDashoffset={offset}
+            strokeLinecap="round"
+            style={{ transition: 'stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1)' }}
           />
         </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-sm font-semibold" style={{ fontFamily: 'var(--font-jetbrains-mono)', color: 'var(--fc-text)' }}>
+        {/* Center text */}
+        <div style={{
+          position: 'absolute', inset: 0,
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <span style={{ fontFamily: 'var(--font-space-mono)', fontWeight: 700, fontSize: size > 60 ? 15 : 12, color: '#F1F1F1', lineHeight: 1 }}>
             {Math.round(value)}g
           </span>
-          <span className="text-[9px]" style={{ fontFamily: 'var(--font-jetbrains-mono)', color: 'var(--fc-text-dim)' }}>
+          <span style={{ fontFamily: 'var(--font-dm-sans)', fontSize: 10, color: 'rgba(255,255,255,0.35)', lineHeight: 1, marginTop: 2 }}>
             / {target}g
           </span>
         </div>
       </div>
+      <span style={{ fontFamily: 'var(--font-dm-sans)', fontWeight: 600, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(255,255,255,0.45)' }}>
+        {label}
+      </span>
+      <span style={{ fontFamily: 'var(--font-dm-sans)', fontSize: 10, fontWeight: 600, color: pct >= 0.8 ? '#3DDC84' : color }}>
+        {pctDisplay}%
+      </span>
     </div>
   )
 }
