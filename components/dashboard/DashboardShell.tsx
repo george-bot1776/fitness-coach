@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { COACHES } from '@/lib/coaches'
 import { buildSystemPrompt } from '@/lib/prompts'
-import { buildContextString, checkExceptions, saveEpisode, saveException, saveFoodLog, saveActivityLog, saveWeightLog, summarizeSession } from '@/lib/memory'
+import { buildContextString, checkExceptions, saveEpisode, saveException, saveFoodLog, saveActivityLog, saveWeightLog, summarizeSession, saveFoodLogForDate, saveActivityLogForDate, updateFoodLog, deleteFoodLog, updateActivityLog, deleteActivityLog } from '@/lib/memory'
+import { matchFoodEntry, matchActivityEntry } from '@/lib/entry-matcher'
 import { Header } from './Header'
 import { CoachTab } from './CoachTab'
 import { ActivityTab } from './ActivityTab'
@@ -247,6 +248,124 @@ export function DashboardShell({ profile, userId, initialFoodLogs, initialActivi
           .sort((a, b) => a.logged_date.localeCompare(b.logged_date))
       })
       await saveWeightLog(userId, lbs, date)
+    }
+
+    if (parsed.type === 'food_log_edit' && parsed.payload) {
+      const { action, target_date, target_description, ...updates } = parsed.payload
+      const result = await matchFoodEntry(userId, target_date, target_description)
+
+      if (result.match === 'none') {
+        // Entry not found — coach message already explains; nothing to execute
+      } else if (result.match === 'ambiguous') {
+        // Coach message should have asked for clarification; nothing to execute
+      } else {
+        const entry = result.entries[0]
+        if (action === 'delete') {
+          await deleteFoodLog(entry.id, userId)
+          // Remove from today's in-memory state if it's today's entry
+          const today = new Date()
+          const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`
+          if (target_date === todayStr) {
+            setFoodLog(prev => {
+              const idx = prev.findIndex(f => f.name.toLowerCase() === entry.name.toLowerCase())
+              if (idx === -1) return prev
+              return [...prev.slice(0, idx), ...prev.slice(idx + 1)]
+            })
+          }
+        } else {
+          const dbUpdates: Record<string, unknown> = {}
+          if (updates.updated_name !== undefined) dbUpdates.name = updates.updated_name
+          if (updates.updated_calories !== undefined) dbUpdates.calories = updates.updated_calories
+          if (updates.updated_protein !== undefined) dbUpdates.protein = updates.updated_protein
+          if (updates.updated_carbs !== undefined) dbUpdates.carbs = updates.updated_carbs
+          if (updates.updated_fat !== undefined) dbUpdates.fat = updates.updated_fat
+          await updateFoodLog(entry.id, userId, dbUpdates)
+          // Update today's in-memory state if it's today's entry
+          const today = new Date()
+          const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`
+          if (target_date === todayStr) {
+            setFoodLog(prev => prev.map(f =>
+              f.name.toLowerCase() === entry.name.toLowerCase()
+                ? {
+                    name: (updates.updated_name ?? f.name),
+                    calories: (updates.updated_calories ?? f.calories),
+                    protein: (updates.updated_protein ?? f.protein),
+                    carbs: (updates.updated_carbs ?? f.carbs),
+                    fat: (updates.updated_fat ?? f.fat),
+                  }
+                : f
+            ))
+          }
+        }
+      }
+    }
+
+    if (parsed.type === 'activity_log_edit' && parsed.payload) {
+      const { action, target_date, target_description, ...updates } = parsed.payload
+      const result = await matchActivityEntry(userId, target_date, target_description)
+
+      if (result.match === 'exact') {
+        const entry = result.entries[0]
+        if (action === 'delete') {
+          await deleteActivityLog(entry.id, userId)
+          const today = new Date()
+          const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`
+          if (target_date === todayStr) {
+            setActivityLog(prev => {
+              const idx = prev.findIndex(a => a.label.toLowerCase() === entry.label.toLowerCase())
+              if (idx === -1) return prev
+              return [...prev.slice(0, idx), ...prev.slice(idx + 1)]
+            })
+            setCaloriesBurned(prev => prev - entry.calories_burned)
+          }
+        } else {
+          const dbUpdates: Record<string, unknown> = {}
+          if (updates.updated_label !== undefined) dbUpdates.label = updates.updated_label
+          if (updates.updated_value !== undefined) dbUpdates.value = updates.updated_value
+          if (updates.updated_calories_burned !== undefined) dbUpdates.calories_burned = updates.updated_calories_burned
+          await updateActivityLog(entry.id, userId, dbUpdates)
+          const today = new Date()
+          const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`
+          if (target_date === todayStr) {
+            setActivityLog(prev => prev.map(a =>
+              a.label.toLowerCase() === entry.label.toLowerCase()
+                ? {
+                    label: (updates.updated_label ?? a.label),
+                    value: (updates.updated_value ?? a.value),
+                    unit: a.unit,
+                    caloriesBurned: (updates.updated_calories_burned ?? a.caloriesBurned),
+                  }
+                : a
+            ))
+            if (updates.updated_calories_burned !== undefined) {
+              setCaloriesBurned(prev => prev - entry.calories_burned + updates.updated_calories_burned!)
+            }
+          }
+        }
+      }
+    }
+
+    if (parsed.type === 'food_log_backdate' && parsed.payload) {
+      const { target_date, ...food } = parsed.payload
+      await saveFoodLogForDate(userId, food, target_date)
+      // Only update in-memory state if it's today's date
+      const today = new Date()
+      const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`
+      if (target_date === todayStr) {
+        setFoodLog(prev => [...prev, { name: food.name, calories: food.calories, protein: food.protein, carbs: food.carbs, fat: food.fat }])
+      }
+    }
+
+    if (parsed.type === 'activity_log_backdate' && parsed.payload) {
+      const { target_date, calories_burned, ...rest } = parsed.payload
+      await saveActivityLogForDate(userId, { ...rest, calories_burned }, target_date)
+      // Only update in-memory state if it's today's date
+      const today = new Date()
+      const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`
+      if (target_date === todayStr) {
+        setActivityLog(prev => [...prev, { label: rest.label, value: rest.value, unit: rest.unit, caloriesBurned: calories_burned }])
+        setCaloriesBurned(prev => prev + calories_burned)
+      }
     }
 
     if (parsed.type === 'exception' && parsed.exception) {

@@ -60,10 +60,29 @@ All 5 tasks shipped. Next session starts Phase 2.
 - `lib/coaches.ts` — COACHES record with all 4 coach definitions
 - `lib/prompts.ts` — buildSystemPrompt
 
-### Phase 2 Next Tasks (pick up here)
-2.1 Macro Accuracy Validation Pipeline — `lib/macro-validation.ts` + food log edit UI
-2.2 Weight Goal + Progress — target weight in settings, progress bar, projections
-2.3 Weekly Automated Summary — Monday morning coach summary
-2.4 Deep Onboarding V2 — 9 questions, dietary restrictions, challenges, checkin prefs
-2.5 Coach Stress Testing — `scripts/coach-stress-test.ts`
-2.6 Web Push Notifications — service worker, VAPID, Vercel cron
+### Phase 2: Coach as Data Agent — COMPLETE ✅ (2026-03-03)
+
+**Shipped:**
+- Coach handles retroactive data: edits, deletes, backdates for food, activity, and weight
+- 4 new response types: `food_log_edit`, `activity_log_edit`, `food_log_backdate`, `activity_log_backdate`
+- `lib/entry-matcher.ts` — fuzzy matches entries by date + description (name similarity + meal context heuristics)
+- `buildContextString` now injects today's + yesterday's food/activity logs so coach knows what's logged
+- System prompt updated with full data agent instructions (detect intent, date resolution, confirmation pattern)
+- Today's in-memory state (foodLog, activityLog) updated on edit/delete/backdate for current day
+
+**Key files:**
+- `lib/entry-matcher.ts` — new: fuzzy entry matching
+- `lib/memory.ts` — new: getFoodLogsByDate, getActivityLogsByDate, saveFoodLogForDate, saveActivityLogForDate, updateFoodLog, deleteFoodLog, updateActivityLog, deleteActivityLog
+- `lib/prompts.ts` — data agent instructions + 4 new response type formats
+- `types/index.ts` — FoodLogEdit, ActivityLogEdit, FoodLogBackdate, ActivityLogBackdate interfaces + CoachResponseType variants
+- `components/dashboard/DashboardShell.tsx` — handleCoachResponse extended for all 4 new types
+
+**Deferred:** UI swipe-to-edit/delete on food log cards (chat-based agent covers all same actions)
+
+### Phase 3 Next Tasks (pick up here)
+3.1 Macro Accuracy Validation Pipeline — `lib/macro-validation.ts` + food log edit UI (swipe-to-edit fallback)
+3.2 Weight Goal + Progress — target weight in settings, progress bar, projections
+3.3 Weekly Automated Summary — Monday morning coach summary
+3.4 Deep Onboarding V2 — 9 questions, dietary restrictions, challenges, checkin prefs
+3.5 Coach Stress Testing — `scripts/coach-stress-test.ts`
+3.6 Web Push Notifications — service worker, VAPID, Vercel cron

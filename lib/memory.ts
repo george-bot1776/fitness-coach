@@ -115,6 +115,45 @@ export async function buildContextString(userId: string): Promise<string> {
   const supabase = createClient()
   const lines: string[] = []
 
+  // Today's and yesterday's logs (so coach can reference them for edits/corrections)
+  const today = localDate()
+  const yesterdayDate = new Date()
+  yesterdayDate.setDate(yesterdayDate.getDate() - 1)
+  const yesterday = `${yesterdayDate.getFullYear()}-${String(yesterdayDate.getMonth() + 1).padStart(2, '0')}-${String(yesterdayDate.getDate()).padStart(2, '0')}`
+
+  const [todayFoods, yesterdayFoods, todayActivities, yesterdayActivities] = await Promise.all([
+    supabase.from('food_logs').select('name,calories,protein,carbs,fat').eq('user_id', userId).eq('session_date', today).order('created_at', { ascending: true }),
+    supabase.from('food_logs').select('name,calories,protein,carbs,fat').eq('user_id', userId).eq('session_date', yesterday).order('created_at', { ascending: true }),
+    supabase.from('activity_logs').select('label,value,unit,calories_burned').eq('user_id', userId).eq('session_date', today),
+    supabase.from('activity_logs').select('label,value,unit,calories_burned').eq('user_id', userId).eq('session_date', yesterday),
+  ])
+
+  if (todayFoods.data?.length) {
+    const totalCal = todayFoods.data.reduce((s, f) => s + f.calories, 0)
+    const totalPro = todayFoods.data.reduce((s, f) => s + f.protein, 0)
+    lines.push(`TODAY'S FOOD LOG (${today}):`)
+    todayFoods.data.forEach(f => lines.push(`  - ${f.name}: ${f.calories} kcal, ${f.protein}p/${f.carbs}c/${f.fat}f`))
+    lines.push(`  Total: ${totalCal} kcal, ${totalPro}g protein`)
+  }
+
+  if (todayActivities.data?.length) {
+    lines.push(`TODAY'S ACTIVITIES:`)
+    todayActivities.data.forEach(a => lines.push(`  - ${a.label}: ${a.value} ${a.unit}, ${a.calories_burned} kcal burned`))
+  }
+
+  if (yesterdayFoods.data?.length) {
+    const totalCal = yesterdayFoods.data.reduce((s, f) => s + f.calories, 0)
+    const totalPro = yesterdayFoods.data.reduce((s, f) => s + f.protein, 0)
+    lines.push(`YESTERDAY'S FOOD LOG (${yesterday}):`)
+    yesterdayFoods.data.forEach(f => lines.push(`  - ${f.name}: ${f.calories} kcal, ${f.protein}p/${f.carbs}c/${f.fat}f`))
+    lines.push(`  Total: ${totalCal} kcal, ${totalPro}g protein`)
+  }
+
+  if (yesterdayActivities.data?.length) {
+    lines.push(`YESTERDAY'S ACTIVITIES:`)
+    yesterdayActivities.data.forEach(a => lines.push(`  - ${a.label}: ${a.value} ${a.unit}, ${a.calories_burned} kcal burned`))
+  }
+
   // Active exceptions
   const now = new Date().toISOString()
   const { data: active } = await supabase
@@ -275,6 +314,41 @@ export async function saveFoodLog(userId: string, food: {
   await supabase.from('food_logs').insert({ user_id: userId, session_date: today, ...food })
 }
 
+export async function getFoodLogsByDate(userId: string, date: string): Promise<FoodLog[]> {
+  const supabase = createClient()
+  const { data } = await supabase
+    .from('food_logs')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('session_date', date)
+    .order('created_at', { ascending: true })
+  return data ?? []
+}
+
+export async function saveFoodLogForDate(userId: string, food: {
+  name: string; calories: number; protein: number; carbs: number; fat: number
+}, date: string): Promise<FoodLog | null> {
+  const supabase = createClient()
+  const { data } = await supabase
+    .from('food_logs')
+    .insert({ user_id: userId, session_date: date, ...food })
+    .select()
+    .single()
+  return data ?? null
+}
+
+export async function updateFoodLog(id: string, userId: string, updates: {
+  name?: string; calories?: number; protein?: number; carbs?: number; fat?: number
+}): Promise<void> {
+  const supabase = createClient()
+  await supabase.from('food_logs').update(updates).eq('id', id).eq('user_id', userId)
+}
+
+export async function deleteFoodLog(id: string, userId: string): Promise<void> {
+  const supabase = createClient()
+  await supabase.from('food_logs').delete().eq('id', id).eq('user_id', userId)
+}
+
 export async function getTodayActivityLogs(userId: string): Promise<ActivityLog[]> {
   const supabase = createClient()
   const today = localDate()
@@ -293,6 +367,41 @@ export async function saveActivityLog(userId: string, activity: {
   const supabase = createClient()
   const today = localDate()
   await supabase.from('activity_logs').insert({ user_id: userId, session_date: today, ...activity })
+}
+
+export async function getActivityLogsByDate(userId: string, date: string): Promise<ActivityLog[]> {
+  const supabase = createClient()
+  const { data } = await supabase
+    .from('activity_logs')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('session_date', date)
+    .order('created_at', { ascending: true })
+  return data ?? []
+}
+
+export async function saveActivityLogForDate(userId: string, activity: {
+  label: string; value: number; unit: string; calories_burned: number
+}, date: string): Promise<ActivityLog | null> {
+  const supabase = createClient()
+  const { data } = await supabase
+    .from('activity_logs')
+    .insert({ user_id: userId, session_date: date, ...activity })
+    .select()
+    .single()
+  return data ?? null
+}
+
+export async function updateActivityLog(id: string, userId: string, updates: {
+  label?: string; value?: number; unit?: string; calories_burned?: number
+}): Promise<void> {
+  const supabase = createClient()
+  await supabase.from('activity_logs').update(updates).eq('id', id).eq('user_id', userId)
+}
+
+export async function deleteActivityLog(id: string, userId: string): Promise<void> {
+  const supabase = createClient()
+  await supabase.from('activity_logs').delete().eq('id', id).eq('user_id', userId)
 }
 
 // ---- Weight Logs --------------------------------------------

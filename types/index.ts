@@ -121,6 +121,43 @@ export interface DailySummary {
   tomorrowTip: string
 }
 
+export interface FoodLogEdit {
+  action: 'update' | 'delete'
+  target_date: string
+  target_description: string
+  updated_name?: string
+  updated_calories?: number
+  updated_protein?: number
+  updated_carbs?: number
+  updated_fat?: number
+}
+
+export interface ActivityLogEdit {
+  action: 'update' | 'delete'
+  target_date: string
+  target_description: string
+  updated_label?: string
+  updated_value?: number
+  updated_calories_burned?: number
+}
+
+export interface FoodLogBackdate {
+  target_date: string
+  name: string
+  calories: number
+  protein: number
+  carbs: number
+  fat: number
+}
+
+export interface ActivityLogBackdate {
+  target_date: string
+  label: string
+  value: number
+  unit: string
+  calories_burned: number
+}
+
 export type CoachResponseType =
   | { type: 'food_log'; message: string; food: FoodItem; dinnerSuggestion?: string }
   | { type: 'activity_log'; message: string; activity: ActivityItem }
@@ -128,6 +165,10 @@ export type CoachResponseType =
   | { type: 'exception'; message: string; exception: { note: string; expires: string; followUp: boolean } }
   | { type: 'daily_summary'; message: string; summary: DailySummary }
   | { type: 'weight_log'; message: string; weight: { lbs: number; date?: string } }
+  | { type: 'food_log_edit'; message: string; payload: FoodLogEdit }
+  | { type: 'activity_log_edit'; message: string; payload: ActivityLogEdit }
+  | { type: 'food_log_backdate'; message: string; payload: FoodLogBackdate }
+  | { type: 'activity_log_backdate'; message: string; payload: ActivityLogBackdate }
   | { type: 'chat'; message: string }
   | { blocked: true; message: string }
 
