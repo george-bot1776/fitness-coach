@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { COACHES } from '@/lib/coaches'
 import { buildSystemPrompt } from '@/lib/prompts'
-import { buildContextString, saveException, saveFoodLog, saveActivityLog, saveWeightLog, summarizeSession } from '@/lib/memory'
+import { buildContextString, checkExceptions, saveException, saveFoodLog, saveActivityLog, saveWeightLog, summarizeSession } from '@/lib/memory'
 import { Header } from './Header'
 import { CoachTab } from './CoachTab'
 import { ActivityTab } from './ActivityTab'
@@ -74,12 +74,27 @@ export function DashboardShell({ profile, userId, initialFoodLogs, initialActivi
     return () => window.removeEventListener('beforeunload', handleUnload)
   }, [apiMessages, userId])
 
-  // Send greeting on first load
+  // Send greeting on first load, checking for expired exception follow-ups
   useEffect(() => {
-    const greeting = profile.last_session
-      ? `I'm back. Give me a momentum update based on my last few sessions — look at the trend, keep it 2 sentences.`
-      : `Hi! I'm ${profile.name}. I'm ready to start tracking with you today!`
-    sendMessage(greeting, false)
+    async function initGreeting() {
+      const triggered = await checkExceptions(userId)
+
+      let greeting: string
+      if (triggered.length > 0) {
+        const notes = triggered.map(e => `"${e.note}"`).join(' and ')
+        const prefix = `Some exceptions just wrapped up: ${notes}.`
+        greeting = profile.last_session
+          ? `I'm back. ${prefix} Check in on those briefly, then a quick momentum update from recent sessions. 2 sentences total.`
+          : `Hi! I'm ${profile.name}. ${prefix} Ask me how they went.`
+      } else if (profile.last_session) {
+        greeting = `I'm back. Give me a momentum update based on my last few sessions — look at the trend, keep it 2 sentences.`
+      } else {
+        greeting = `Hi! I'm ${profile.name}. I'm ready to start tracking with you today!`
+      }
+
+      sendMessage(greeting, false)
+    }
+    initGreeting()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
