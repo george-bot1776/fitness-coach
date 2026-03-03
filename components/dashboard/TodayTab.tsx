@@ -4,10 +4,12 @@ import { useState } from 'react'
 import { MacroRing } from './MacroRing'
 import { SummaryCard } from './SummaryCard'
 import { saveWeightLog } from '@/lib/memory'
-import type { FoodItem, DailySummary, Coach, WeightLog } from '@/types'
+import type { FoodLog, DailySummary, Coach, WeightLog } from '@/types'
 
 interface Props {
-  foodLog: FoodItem[]
+  foodLog: FoodLog[]
+  editedFoodIds: Set<string>
+  onDeleteFood: (id: string) => void
   dailySummary: DailySummary | null
   dinnerSuggestion: string | null
   coach: Coach
@@ -51,9 +53,10 @@ function Sparkline({ data, width = 100, height = 30, color }: { data: number[]; 
   )
 }
 
-export function TodayTab({ foodLog, dailySummary, dinnerSuggestion, coach, calorieTarget, userId, weightLbs, weightHistory, onWeightSaved, streaks }: Props) {
+export function TodayTab({ foodLog, editedFoodIds, onDeleteFood, dailySummary, dinnerSuggestion, coach, calorieTarget, userId, weightLbs, weightHistory, onWeightSaved, streaks }: Props) {
   const [weightInput, setWeightInput] = useState('')
   const [saving, setSaving] = useState(false)
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
 
   const totals = foodLog.reduce(
     (acc, f) => ({ protein: acc.protein + f.protein, carbs: acc.carbs + f.carbs, fat: acc.fat + f.fat }),
@@ -259,29 +262,62 @@ export function TodayTab({ foodLog, dailySummary, dinnerSuggestion, coach, calor
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {foodLog.map((food, i) => {
+            {foodLog.map((food) => {
               const proteinRatio = food.protein / Math.max(food.protein + food.carbs + food.fat, 1)
               const isHighProtein = proteinRatio > 0.3
+              const isEdited = editedFoodIds.has(food.id)
+              const isPendingDelete = pendingDeleteId === food.id
               return (
-                <div key={i} style={{
+                <div key={food.id} style={{
                   ...cardStyle,
                   borderLeft: isHighProtein ? '3px solid #3DDC84' : '3px solid rgba(255,255,255,0.06)',
                   padding: '12px 16px',
                   display: 'flex', alignItems: 'center', gap: 12,
                   animation: 'fc-msg-in 0.5s ease both',
+                  background: isPendingDelete ? 'rgba(255,60,60,0.08)' : 'rgba(255,255,255,0.04)',
+                  transition: 'background 0.15s ease',
                 }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>{food.name}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                      <span style={{ fontWeight: 600, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{food.name}</span>
+                      {isEdited && (
+                        <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.06)', borderRadius: 4, padding: '1px 5px', flexShrink: 0 }}>edited</span>
+                      )}
+                    </div>
                     <div style={{ display: 'flex', gap: 10, fontSize: 11 }}>
                       <span style={{ color: isHighProtein ? '#3DDC84' : 'rgba(255,255,255,0.35)' }}>{food.protein}p</span>
                       <span style={{ color: 'rgba(255,255,255,0.35)' }}>{food.carbs}c</span>
                       <span style={{ color: 'rgba(255,255,255,0.35)' }}>{food.fat}f</span>
                     </div>
                   </div>
-                  <div style={{ fontFamily: 'var(--font-space-mono)', fontWeight: 700, fontSize: 16, color: coach.color }}>
+                  <div style={{ fontFamily: 'var(--font-space-mono)', fontWeight: 700, fontSize: 16, color: coach.color, flexShrink: 0 }}>
                     {food.calories}
                   </div>
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)' }}>kcal</div>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', flexShrink: 0 }}>kcal</div>
+                  {isPendingDelete ? (
+                    <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                      <button
+                        onClick={() => { onDeleteFood(food.id); setPendingDeleteId(null) }}
+                        style={{ padding: '3px 8px', borderRadius: 6, background: '#FF4444', border: 'none', color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font-dm-sans)' }}
+                      >
+                        Delete
+                      </button>
+                      <button
+                        onClick={() => setPendingDeleteId(null)}
+                        style={{ padding: '3px 6px', borderRadius: 6, background: 'rgba(255,255,255,0.08)', border: 'none', color: 'rgba(255,255,255,0.5)', fontSize: 11, cursor: 'pointer', fontFamily: 'var(--font-dm-sans)' }}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setPendingDeleteId(food.id)}
+                      style={{ padding: '4px 6px', borderRadius: 6, background: 'none', border: 'none', color: 'rgba(255,255,255,0.2)', fontSize: 14, cursor: 'pointer', flexShrink: 0, lineHeight: 1 }}
+                      title="Delete entry"
+                    >
+                      ×
+                    </button>
+                  )}
                 </div>
               )
             })}

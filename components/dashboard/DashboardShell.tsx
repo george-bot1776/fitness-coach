@@ -12,7 +12,7 @@ import { CoachTab } from './CoachTab'
 import { ActivityTab } from './ActivityTab'
 import { TodayTab } from './TodayTab'
 import { HistoryTab } from './HistoryTab'
-import type { Profile, FoodLog, ActivityLog, ChatMessage, CoachResponseType, FoodItem, ActivityItem, DailySummary, WeightLog } from '@/types'
+import type { Profile, FoodLog, ActivityLog, ChatMessage, CoachResponseType, DailySummary, WeightLog } from '@/types'
 
 interface Props {
   profile: Profile
@@ -32,21 +32,22 @@ interface DisplayMessage {
   summary?: DailySummary
 }
 
+function todayStr() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+}
+
 export function DashboardShell({ profile, userId, initialFoodLogs, initialActivityLogs, initialWeightLbs, initialWeightHistory }: Props) {
   const router = useRouter()
   const coach = COACHES[profile.coach_id] ?? COACHES.aria
 
   const [activeTab, setActiveTab] = useState('coach')
 
-  // Session state
+  // Session state — FoodLog/ActivityLog so we have IDs for edit/delete
   const [apiMessages, setApiMessages] = useState<ChatMessage[]>([])
   const [displayMessages, setDisplayMessages] = useState<DisplayMessage[]>([])
-  const [foodLog, setFoodLog] = useState<FoodItem[]>(
-    initialFoodLogs.map(f => ({ name: f.name, calories: f.calories, protein: f.protein, carbs: f.carbs, fat: f.fat }))
-  )
-  const [activityLog, setActivityLog] = useState<ActivityItem[]>(
-    initialActivityLogs.map(a => ({ label: a.label, value: a.value, unit: a.unit, caloriesBurned: a.calories_burned }))
-  )
+  const [foodLog, setFoodLog] = useState<FoodLog[]>(initialFoodLogs)
+  const [activityLog, setActivityLog] = useState<ActivityLog[]>(initialActivityLogs)
   const [caloriesBurned, setCaloriesBurned] = useState(
     initialActivityLogs.reduce((s, a) => s + a.calories_burned, 0)
   )
@@ -55,6 +56,9 @@ export function DashboardShell({ profile, userId, initialFoodLogs, initialActivi
   const [weightLbs, setWeightLbs] = useState<number | null>(initialWeightLbs)
   const [weightHistory, setWeightHistory] = useState<WeightLog[]>(initialWeightHistory)
   const [isLoading, setIsLoading] = useState(false)
+  // Track which entries were edited this session (for the edited badge)
+  const [editedFoodIds, setEditedFoodIds] = useState<Set<string>>(new Set())
+  const [editedActivityIds, setEditedActivityIds] = useState<Set<string>>(new Set())
 
   // Apply coach accent CSS variable
   useEffect(() => {
@@ -221,26 +225,24 @@ export function DashboardShell({ profile, userId, initialFoodLogs, initialActivi
 
     if (parsed.type === 'food_log' && parsed.food) {
       const food = parsed.food
-      setFoodLog(prev => [...prev, food])
-      await saveFoodLog(userId, food)
+      const saved = await saveFoodLog(userId, food)
+      if (saved) setFoodLog(prev => [...prev, saved])
       if (parsed.dinnerSuggestion) setDinnerSuggestion(parsed.dinnerSuggestion)
     }
 
     if (parsed.type === 'activity_log' && parsed.activity) {
       const act = parsed.activity
-      setActivityLog(prev => [...prev, act])
-      setCaloriesBurned(prev => prev + (act.caloriesBurned ?? 0))
-      await saveActivityLog(userId, { label: act.label, value: act.value, unit: act.unit, calories_burned: act.caloriesBurned })
+      const saved = await saveActivityLog(userId, { label: act.label, value: act.value, unit: act.unit, calories_burned: act.caloriesBurned })
+      if (saved) {
+        setActivityLog(prev => [...prev, saved])
+        setCaloriesBurned(prev => prev + (act.caloriesBurned ?? 0))
+      }
     }
 
     if (parsed.type === 'weight_log' && parsed.weight) {
       const { lbs, date } = parsed.weight
-      const logDate = date ?? (() => {
-        const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
-      })()
-      const isToday = logDate === (() => {
-        const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
-      })()
+      const logDate = date ?? todayStr()
+      const isToday = logDate === todayStr()
       if (isToday) setWeightLbs(lbs)
       setWeightHistory(prev => {
         const filtered = prev.filter(w => w.logged_date !== logDate)
@@ -254,23 +256,12 @@ export function DashboardShell({ profile, userId, initialFoodLogs, initialActivi
       const { action, target_date, target_description, ...updates } = parsed.payload
       const result = await matchFoodEntry(userId, target_date, target_description)
 
-      if (result.match === 'none') {
-        // Entry not found — coach message already explains; nothing to execute
-      } else if (result.match === 'ambiguous') {
-        // Coach message should have asked for clarification; nothing to execute
-      } else {
+      if (result.match === 'exact') {
         const entry = result.entries[0]
         if (action === 'delete') {
           await deleteFoodLog(entry.id, userId)
-          // Remove from today's in-memory state if it's today's entry
-          const today = new Date()
-          const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`
-          if (target_date === todayStr) {
-            setFoodLog(prev => {
-              const idx = prev.findIndex(f => f.name.toLowerCase() === entry.name.toLowerCase())
-              if (idx === -1) return prev
-              return [...prev.slice(0, idx), ...prev.slice(idx + 1)]
-            })
+          if (target_date === todayStr()) {
+            setFoodLog(prev => prev.filter(f => f.id !== entry.id))
           }
         } else {
           const dbUpdates: Record<string, unknown> = {}
@@ -280,21 +271,19 @@ export function DashboardShell({ profile, userId, initialFoodLogs, initialActivi
           if (updates.updated_carbs !== undefined) dbUpdates.carbs = updates.updated_carbs
           if (updates.updated_fat !== undefined) dbUpdates.fat = updates.updated_fat
           await updateFoodLog(entry.id, userId, dbUpdates)
-          // Update today's in-memory state if it's today's entry
-          const today = new Date()
-          const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`
-          if (target_date === todayStr) {
+          if (target_date === todayStr()) {
             setFoodLog(prev => prev.map(f =>
-              f.name.toLowerCase() === entry.name.toLowerCase()
-                ? {
-                    name: (updates.updated_name ?? f.name),
-                    calories: (updates.updated_calories ?? f.calories),
-                    protein: (updates.updated_protein ?? f.protein),
-                    carbs: (updates.updated_carbs ?? f.carbs),
-                    fat: (updates.updated_fat ?? f.fat),
+              f.id === entry.id
+                ? { ...f,
+                    name: updates.updated_name ?? f.name,
+                    calories: updates.updated_calories ?? f.calories,
+                    protein: updates.updated_protein ?? f.protein,
+                    carbs: updates.updated_carbs ?? f.carbs,
+                    fat: updates.updated_fat ?? f.fat,
                   }
                 : f
             ))
+            setEditedFoodIds(prev => new Set([...prev, entry.id]))
           }
         }
       }
@@ -308,14 +297,8 @@ export function DashboardShell({ profile, userId, initialFoodLogs, initialActivi
         const entry = result.entries[0]
         if (action === 'delete') {
           await deleteActivityLog(entry.id, userId)
-          const today = new Date()
-          const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`
-          if (target_date === todayStr) {
-            setActivityLog(prev => {
-              const idx = prev.findIndex(a => a.label.toLowerCase() === entry.label.toLowerCase())
-              if (idx === -1) return prev
-              return [...prev.slice(0, idx), ...prev.slice(idx + 1)]
-            })
+          if (target_date === todayStr()) {
+            setActivityLog(prev => prev.filter(a => a.id !== entry.id))
             setCaloriesBurned(prev => prev - entry.calories_burned)
           }
         } else {
@@ -324,22 +307,20 @@ export function DashboardShell({ profile, userId, initialFoodLogs, initialActivi
           if (updates.updated_value !== undefined) dbUpdates.value = updates.updated_value
           if (updates.updated_calories_burned !== undefined) dbUpdates.calories_burned = updates.updated_calories_burned
           await updateActivityLog(entry.id, userId, dbUpdates)
-          const today = new Date()
-          const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`
-          if (target_date === todayStr) {
+          if (target_date === todayStr()) {
             setActivityLog(prev => prev.map(a =>
-              a.label.toLowerCase() === entry.label.toLowerCase()
-                ? {
-                    label: (updates.updated_label ?? a.label),
-                    value: (updates.updated_value ?? a.value),
-                    unit: a.unit,
-                    caloriesBurned: (updates.updated_calories_burned ?? a.caloriesBurned),
+              a.id === entry.id
+                ? { ...a,
+                    label: updates.updated_label ?? a.label,
+                    value: updates.updated_value ?? a.value,
+                    calories_burned: updates.updated_calories_burned ?? a.calories_burned,
                   }
                 : a
             ))
             if (updates.updated_calories_burned !== undefined) {
               setCaloriesBurned(prev => prev - entry.calories_burned + updates.updated_calories_burned!)
             }
+            setEditedActivityIds(prev => new Set([...prev, entry.id]))
           }
         }
       }
@@ -347,23 +328,17 @@ export function DashboardShell({ profile, userId, initialFoodLogs, initialActivi
 
     if (parsed.type === 'food_log_backdate' && parsed.payload) {
       const { target_date, ...food } = parsed.payload
-      await saveFoodLogForDate(userId, food, target_date)
-      // Only update in-memory state if it's today's date
-      const today = new Date()
-      const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`
-      if (target_date === todayStr) {
-        setFoodLog(prev => [...prev, { name: food.name, calories: food.calories, protein: food.protein, carbs: food.carbs, fat: food.fat }])
+      const saved = await saveFoodLogForDate(userId, food, target_date)
+      if (saved && target_date === todayStr()) {
+        setFoodLog(prev => [...prev, saved])
       }
     }
 
     if (parsed.type === 'activity_log_backdate' && parsed.payload) {
       const { target_date, calories_burned, ...rest } = parsed.payload
-      await saveActivityLogForDate(userId, { ...rest, calories_burned }, target_date)
-      // Only update in-memory state if it's today's date
-      const today = new Date()
-      const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`
-      if (target_date === todayStr) {
-        setActivityLog(prev => [...prev, { label: rest.label, value: rest.value, unit: rest.unit, caloriesBurned: calories_burned }])
+      const saved = await saveActivityLogForDate(userId, { ...rest, calories_burned }, target_date)
+      if (saved && target_date === todayStr()) {
+        setActivityLog(prev => [...prev, saved])
         setCaloriesBurned(prev => prev + calories_burned)
       }
     }
@@ -375,14 +350,12 @@ export function DashboardShell({ profile, userId, initialFoodLogs, initialActivi
 
     if (parsed.type === 'daily_summary' && parsed.summary) {
       setDailySummary(parsed.summary)
-      // Attach summary card to the coach message in the feed
       setDisplayMessages(prev => {
         const updated = [...prev]
         const last = updated[updated.length - 1]
         if (last?.role === 'coach') updated[updated.length - 1] = { ...last, summary: parsed.summary }
         return updated
       })
-      // Persist as an episode
       await saveEpisode(userId, parsed.message, [
         `Calories: ${parsed.summary.totalCalories} eaten, ${parsed.summary.caloriesBurned} burned`,
         `Protein: ${parsed.summary.protein}g`,
@@ -390,6 +363,18 @@ export function DashboardShell({ profile, userId, initialFoodLogs, initialActivi
         `Improve: ${parsed.summary.improvement}`,
       ])
     }
+  }
+
+  async function handleDeleteFood(id: string) {
+    await deleteFoodLog(id, userId)
+    setFoodLog(prev => prev.filter(f => f.id !== id))
+  }
+
+  async function handleDeleteActivity(id: string) {
+    const entry = activityLog.find(a => a.id === id)
+    await deleteActivityLog(id, userId)
+    setActivityLog(prev => prev.filter(a => a.id !== id))
+    if (entry) setCaloriesBurned(prev => prev - entry.calories_burned)
   }
 
   function handleLogActivity(text: string) {
@@ -428,12 +413,15 @@ export function DashboardShell({ profile, userId, initialFoodLogs, initialActivi
             activityLog={activityLog}
             caloriesBurned={caloriesBurned}
             onLogActivity={handleLogActivity}
+            onDeleteActivity={handleDeleteActivity}
             coach={coach}
           />
         )}
         {activeTab === 'today' && (
           <TodayTab
             foodLog={foodLog}
+            editedFoodIds={editedFoodIds}
+            onDeleteFood={handleDeleteFood}
             dailySummary={dailySummary}
             dinnerSuggestion={dinnerSuggestion}
             coach={coach}
@@ -444,8 +432,7 @@ export function DashboardShell({ profile, userId, initialFoodLogs, initialActivi
             streaks={profile.streaks}
             onWeightSaved={(lbs) => {
               setWeightLbs(lbs)
-              const d = new Date()
-              const today = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+              const today = todayStr()
               setWeightHistory(prev => {
                 const filtered = prev.filter(w => w.logged_date !== today)
                 return [...filtered, { id: '', user_id: userId, logged_date: today, weight_lbs: lbs, created_at: new Date().toISOString() }]

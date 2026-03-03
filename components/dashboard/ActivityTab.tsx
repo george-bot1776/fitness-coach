@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import type { ActivityItem, Coach } from '@/types'
+import type { ActivityLog, Coach } from '@/types'
 
 const ACTIVITY_TYPES = [
   { value: 'running',      label: '🏃 Running',      unit: 'minutes', icon: '🏃' },
@@ -18,16 +18,18 @@ const ACTIVITY_TYPES = [
 const BURN_TARGET = 800
 
 interface Props {
-  activityLog: ActivityItem[]
+  activityLog: ActivityLog[]
   caloriesBurned: number
   onLogActivity: (text: string) => void
+  onDeleteActivity: (id: string) => void
   coach: Coach
 }
 
-export function ActivityTab({ activityLog, caloriesBurned, onLogActivity, coach }: Props) {
+export function ActivityTab({ activityLog, caloriesBurned, onLogActivity, onDeleteActivity, coach }: Props) {
   const [showForm, setShowForm] = useState(false)
   const [actType, setActType] = useState('running')
   const [amount, setAmount] = useState('')
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
 
   function handleLog() {
     if (!amount) return
@@ -198,11 +200,12 @@ export function ActivityTab({ activityLog, caloriesBurned, onLogActivity, coach 
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {activityLog.map((act, i) => {
+            {activityLog.map((act) => {
               const typeInfo = ACTIVITY_TYPES.find(t => act.label.toLowerCase().includes(t.value)) ?? ACTIVITY_TYPES[0]
+              const isPendingDelete = pendingDeleteId === act.id
               return (
-                <div key={i} style={{
-                  background: 'rgba(255,255,255,0.04)',
+                <div key={act.id} style={{
+                  background: isPendingDelete ? 'rgba(255,60,60,0.08)' : 'rgba(255,255,255,0.04)',
                   border: '1px solid rgba(255,255,255,0.06)',
                   borderRadius: 16,
                   borderLeft: `3px solid ${coach.color}`,
@@ -211,6 +214,7 @@ export function ActivityTab({ activityLog, caloriesBurned, onLogActivity, coach 
                   alignItems: 'center',
                   gap: 14,
                   animation: 'fc-msg-in 0.5s ease both',
+                  transition: 'background 0.15s ease',
                 }}>
                   <div style={{
                     width: 44, height: 44, borderRadius: 12,
@@ -220,18 +224,42 @@ export function ActivityTab({ activityLog, caloriesBurned, onLogActivity, coach 
                   }}>
                     {typeInfo.icon}
                   </div>
-                  <div style={{ flex: 1 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 2 }}>{act.label}</div>
                     <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>
                       {act.value} {act.unit}
                     </div>
                   </div>
-                  <div style={{ textAlign: 'right' }}>
+                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
                     <div style={{ fontFamily: 'var(--font-space-mono)', fontWeight: 700, fontSize: 16, color: '#3DDC84' }}>
-                      +{act.caloriesBurned}
+                      +{act.calories_burned}
                     </div>
                     <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>kcal</div>
                   </div>
+                  {isPendingDelete ? (
+                    <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                      <button
+                        onClick={() => { onDeleteActivity(act.id); setPendingDeleteId(null) }}
+                        style={{ padding: '3px 8px', borderRadius: 6, background: '#FF4444', border: 'none', color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font-dm-sans)' }}
+                      >
+                        Delete
+                      </button>
+                      <button
+                        onClick={() => setPendingDeleteId(null)}
+                        style={{ padding: '3px 6px', borderRadius: 6, background: 'rgba(255,255,255,0.08)', border: 'none', color: 'rgba(255,255,255,0.5)', fontSize: 11, cursor: 'pointer', fontFamily: 'var(--font-dm-sans)' }}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setPendingDeleteId(act.id)}
+                      style={{ padding: '4px 6px', borderRadius: 6, background: 'none', border: 'none', color: 'rgba(255,255,255,0.2)', fontSize: 14, cursor: 'pointer', flexShrink: 0, lineHeight: 1 }}
+                      title="Delete entry"
+                    >
+                      ×
+                    </button>
+                  )}
                 </div>
               )
             })}

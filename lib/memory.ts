@@ -308,10 +308,15 @@ export async function getTodayFoodLogs(userId: string): Promise<FoodLog[]> {
 
 export async function saveFoodLog(userId: string, food: {
   name: string; calories: number; protein: number; carbs: number; fat: number
-}): Promise<void> {
+}): Promise<FoodLog | null> {
   const supabase = createClient()
   const today = localDate()
-  await supabase.from('food_logs').insert({ user_id: userId, session_date: today, ...food })
+  const { data } = await supabase
+    .from('food_logs')
+    .insert({ user_id: userId, session_date: today, ...food })
+    .select()
+    .single()
+  return data ?? null
 }
 
 export async function getFoodLogsByDate(userId: string, date: string): Promise<FoodLog[]> {
@@ -363,10 +368,15 @@ export async function getTodayActivityLogs(userId: string): Promise<ActivityLog[
 
 export async function saveActivityLog(userId: string, activity: {
   label: string; value: number; unit: string; calories_burned: number
-}): Promise<void> {
+}): Promise<ActivityLog | null> {
   const supabase = createClient()
   const today = localDate()
-  await supabase.from('activity_logs').insert({ user_id: userId, session_date: today, ...activity })
+  const { data } = await supabase
+    .from('activity_logs')
+    .insert({ user_id: userId, session_date: today, ...activity })
+    .select()
+    .single()
+  return data ?? null
 }
 
 export async function getActivityLogsByDate(userId: string, date: string): Promise<ActivityLog[]> {
