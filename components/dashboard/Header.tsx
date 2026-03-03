@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import type { Coach } from '@/types'
 
 interface Props {
@@ -41,8 +42,8 @@ export function Header({ coach, caloriesEaten, caloriesBurned, calorieTarget, ac
           </div>
         </div>
 
-        {/* Stat pills */}
-        <div style={{ display: 'flex', gap: 8 }}>
+        {/* Stat pills + settings */}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {caloriesBurned > 0 && (
             <div style={{
               padding: '5px 10px', borderRadius: 20,
@@ -62,6 +63,17 @@ export function Header({ coach, caloriesEaten, caloriesBurned, calorieTarget, ac
           }}>
             {isOver ? `${Math.abs(remaining)} over` : `${remaining} left`}
           </div>
+
+          <Link href="/settings" style={{
+            width: 32, height: 32, borderRadius: 10,
+            background: 'rgba(255,255,255,0.06)',
+            border: '1px solid rgba(255,255,255,0.08)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 15, color: 'rgba(255,255,255,0.45)',
+            textDecoration: 'none', flexShrink: 0,
+          }}>
+            ⚙
+          </Link>
         </div>
       </div>
 
