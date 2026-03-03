@@ -90,7 +90,7 @@ export function Header({ coach, caloriesEaten, caloriesBurned, calorieTarget, ac
 
       {/* Tab navigation */}
       <div style={{ display: 'flex', padding: '12px 12px 0' }}>
-        {['coach', 'activity', 'today'].map(tab => (
+        {['coach', 'activity', 'today', 'history'].map(tab => (
           <button
             key={tab}
             onClick={() => onTabChange(tab)}

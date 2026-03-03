@@ -10,6 +10,7 @@ import { Header } from './Header'
 import { CoachTab } from './CoachTab'
 import { ActivityTab } from './ActivityTab'
 import { TodayTab } from './TodayTab'
+import { HistoryTab } from './HistoryTab'
 import type { Profile, FoodLog, ActivityLog, ChatMessage, CoachResponseType, FoodItem, ActivityItem, DailySummary, WeightLog } from '@/types'
 
 interface Props {
@@ -282,6 +283,13 @@ export function DashboardShell({ profile, userId, initialFoodLogs, initialActivi
                 return [...filtered, { id: '', user_id: userId, logged_date: today, weight_lbs: lbs, created_at: new Date().toISOString() }]
               })
             }}
+          />
+        )}
+        {activeTab === 'history' && (
+          <HistoryTab
+            coach={coach}
+            userId={userId}
+            calorieTarget={profile.calorie_target}
           />
         )}
       </div>
