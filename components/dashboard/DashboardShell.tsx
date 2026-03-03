@@ -79,15 +79,25 @@ export function DashboardShell({ profile, userId, initialFoodLogs, initialActivi
     async function initGreeting() {
       const triggered = await checkExceptions(userId)
 
+      const MILESTONES = [3, 7, 14, 30, 60, 100]
+      const loggingStreak = profile.streaks?.logging ?? 0
+      const proteinStreak = profile.streaks?.protein ?? 0
+      const streakMilestone = MILESTONES.includes(loggingStreak) ? loggingStreak : null
+      const proteinMilestone = MILESTONES.includes(proteinStreak) ? proteinStreak : null
+
+      let streakNote = ''
+      if (streakMilestone) streakNote += ` My logging streak just hit ${streakMilestone} days — acknowledge it.`
+      if (proteinMilestone) streakNote += ` My protein streak just hit ${proteinMilestone} days — acknowledge it.`
+
       let greeting: string
       if (triggered.length > 0) {
         const notes = triggered.map(e => `"${e.note}"`).join(' and ')
         const prefix = `Some exceptions just wrapped up: ${notes}.`
         greeting = profile.last_session
-          ? `I'm back. ${prefix} Check in on those briefly, then a quick momentum update from recent sessions. 2 sentences total.`
+          ? `I'm back. ${prefix} Check in on those briefly, then a quick momentum update from recent sessions.${streakNote} 2 sentences total.`
           : `Hi! I'm ${profile.name}. ${prefix} Ask me how they went.`
       } else if (profile.last_session) {
-        greeting = `I'm back. Give me a momentum update based on my last few sessions — look at the trend, keep it 2 sentences.`
+        greeting = `I'm back. Give me a momentum update based on my last few sessions — look at the trend, keep it 2 sentences.${streakNote}`
       } else {
         greeting = `Hi! I'm ${profile.name}. I'm ready to start tracking with you today!`
       }
@@ -261,6 +271,7 @@ export function DashboardShell({ profile, userId, initialFoodLogs, initialActivi
         calorieTarget={profile.calorie_target}
         activeTab={activeTab}
         onTabChange={setActiveTab}
+        streaks={profile.streaks}
       />
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
@@ -290,6 +301,7 @@ export function DashboardShell({ profile, userId, initialFoodLogs, initialActivi
             userId={userId}
             weightLbs={weightLbs}
             weightHistory={weightHistory}
+            streaks={profile.streaks}
             onWeightSaved={(lbs) => {
               setWeightLbs(lbs)
               const today = new Date().toISOString().split('T')[0]

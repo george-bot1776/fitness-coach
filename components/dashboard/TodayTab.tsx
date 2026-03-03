@@ -16,6 +16,7 @@ interface Props {
   weightLbs: number | null
   weightHistory: WeightLog[]
   onWeightSaved: (lbs: number) => void
+  streaks: { logging: number; protein: number }
 }
 
 function Sparkline({ data, width = 100, height = 30, color }: { data: number[]; width?: number; height?: number; color: string }) {
@@ -50,7 +51,7 @@ function Sparkline({ data, width = 100, height = 30, color }: { data: number[]; 
   )
 }
 
-export function TodayTab({ foodLog, dailySummary, dinnerSuggestion, coach, calorieTarget, userId, weightLbs, weightHistory, onWeightSaved }: Props) {
+export function TodayTab({ foodLog, dailySummary, dinnerSuggestion, coach, calorieTarget, userId, weightLbs, weightHistory, onWeightSaved, streaks }: Props) {
   const [weightInput, setWeightInput] = useState('')
   const [saving, setSaving] = useState(false)
 
@@ -211,6 +212,36 @@ export function TodayTab({ foodLog, dailySummary, dinnerSuggestion, coach, calor
           <MacroRing label="Fat" value={Math.round(totals.fat)} target={targets.fat} color="#8B5CF6" trackColor="rgba(139,92,246,0.12)" size={80} />
         </div>
       </div>
+
+      {/* Streaks */}
+      {(streaks.logging > 0 || streaks.protein > 0) && (
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(255,255,255,0.3)', marginBottom: 10 }}>
+            Streaks
+          </div>
+          <div style={{ ...cardStyle, padding: '14px 18px', display: 'flex', gap: 0 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                <span style={{ fontSize: 18 }}>🔥</span>
+                <span style={{ fontFamily: 'var(--font-space-mono)', fontWeight: 700, fontSize: 22, color: streaks.logging >= 3 ? '#FF6B2B' : 'rgba(255,255,255,0.4)' }}>
+                  {streaks.logging}
+                </span>
+              </div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>Day logging streak</div>
+            </div>
+            <div style={{ width: 1, background: 'rgba(255,255,255,0.06)', margin: '0 16px' }} />
+            <div style={{ flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                <span style={{ fontSize: 18 }}>💪</span>
+                <span style={{ fontFamily: 'var(--font-space-mono)', fontWeight: 700, fontSize: 22, color: streaks.protein >= 3 ? '#3DDC84' : 'rgba(255,255,255,0.4)' }}>
+                  {streaks.protein}
+                </span>
+              </div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>Day protein streak</div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Food log */}
       <div>

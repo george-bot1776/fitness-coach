@@ -8,9 +8,10 @@ interface Props {
   calorieTarget: number
   activeTab: string
   onTabChange: (tab: string) => void
+  streaks: { logging: number; protein: number }
 }
 
-export function Header({ coach, caloriesEaten, caloriesBurned, calorieTarget, activeTab, onTabChange }: Props) {
+export function Header({ coach, caloriesEaten, caloriesBurned, calorieTarget, activeTab, onTabChange, streaks }: Props) {
   const adjusted = calorieTarget + caloriesBurned
   const remaining = adjusted - caloriesEaten
   const pct = Math.min(1, caloriesEaten / adjusted)
@@ -39,6 +40,34 @@ export function Header({ coach, caloriesEaten, caloriesBurned, calorieTarget, ac
             <div style={{ fontSize: 11, fontWeight: 600, color: coach.color, letterSpacing: '0.03em', opacity: 0.9, fontFamily: 'var(--font-dm-sans)' }}>
               {coach.modeLabel}
             </div>
+          </div>
+
+          {/* Streak badges */}
+          <div style={{ display: 'flex', gap: 6 }}>
+            {streaks.logging >= 3 && (
+              <div className="animate-pulse" style={{
+                padding: '3px 8px', borderRadius: 20,
+                background: 'rgba(255,107,43,0.15)',
+                border: '1px solid rgba(255,107,43,0.3)',
+                fontSize: 11, fontWeight: 700, color: '#FF6B2B',
+                display: 'flex', alignItems: 'center', gap: 3,
+                fontFamily: 'var(--font-space-mono)',
+              }}>
+                🔥{streaks.logging}
+              </div>
+            )}
+            {streaks.protein >= 3 && (
+              <div style={{
+                padding: '3px 8px', borderRadius: 20,
+                background: 'rgba(61,220,132,0.1)',
+                border: '1px solid rgba(61,220,132,0.25)',
+                fontSize: 11, fontWeight: 700, color: '#3DDC84',
+                display: 'flex', alignItems: 'center', gap: 3,
+                fontFamily: 'var(--font-space-mono)',
+              }}>
+                💪{streaks.protein}
+              </div>
+            )}
           </div>
         </div>
 
