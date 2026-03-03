@@ -1,6 +1,16 @@
 import { createClient } from '@/lib/supabase/client'
 import type { Profile, Episode, AppException, FoodLog, ActivityLog, ChatMessage, WeightLog } from '@/types'
 
+// Always use the browser's local date (not UTC) so a meal logged at 11 PM
+// stays on that day's log, not the next UTC day.
+function localDate(): string {
+  const d = new Date()
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 // ---- Profile (Tier 3) ----------------------------------------
 
 export async function getProfile(userId: string): Promise<Profile | null> {
@@ -247,7 +257,7 @@ ${transcript}`,
 
 export async function getTodayFoodLogs(userId: string): Promise<FoodLog[]> {
   const supabase = createClient()
-  const today = new Date().toISOString().split('T')[0]
+  const today = localDate()
   const { data } = await supabase
     .from('food_logs')
     .select('*')
@@ -261,13 +271,13 @@ export async function saveFoodLog(userId: string, food: {
   name: string; calories: number; protein: number; carbs: number; fat: number
 }): Promise<void> {
   const supabase = createClient()
-  const today = new Date().toISOString().split('T')[0]
+  const today = localDate()
   await supabase.from('food_logs').insert({ user_id: userId, session_date: today, ...food })
 }
 
 export async function getTodayActivityLogs(userId: string): Promise<ActivityLog[]> {
   const supabase = createClient()
-  const today = new Date().toISOString().split('T')[0]
+  const today = localDate()
   const { data } = await supabase
     .from('activity_logs')
     .select('*')
@@ -281,7 +291,7 @@ export async function saveActivityLog(userId: string, activity: {
   label: string; value: number; unit: string; calories_burned: number
 }): Promise<void> {
   const supabase = createClient()
-  const today = new Date().toISOString().split('T')[0]
+  const today = localDate()
   await supabase.from('activity_logs').insert({ user_id: userId, session_date: today, ...activity })
 }
 
@@ -289,7 +299,7 @@ export async function saveActivityLog(userId: string, activity: {
 
 export async function getTodayWeightLog(userId: string): Promise<WeightLog | null> {
   const supabase = createClient()
-  const today = new Date().toISOString().split('T')[0]
+  const today = localDate()
   const { data } = await supabase
     .from('weight_logs')
     .select('*')
@@ -303,18 +313,19 @@ export async function getWeightHistory(userId: string, days = 30): Promise<Weigh
   const supabase = createClient()
   const since = new Date()
   since.setDate(since.getDate() - days)
+  const sinceStr = `${since.getFullYear()}-${String(since.getMonth() + 1).padStart(2, '0')}-${String(since.getDate()).padStart(2, '0')}`
   const { data } = await supabase
     .from('weight_logs')
     .select('*')
     .eq('user_id', userId)
-    .gte('logged_date', since.toISOString().split('T')[0])
+    .gte('logged_date', sinceStr)
     .order('logged_date', { ascending: true })
   return data ?? []
 }
 
 export async function saveWeightLog(userId: string, weightLbs: number): Promise<void> {
   const supabase = createClient()
-  const today = new Date().toISOString().split('T')[0]
+  const today = localDate()
   await supabase.from('weight_logs').upsert({
     user_id: userId,
     logged_date: today,

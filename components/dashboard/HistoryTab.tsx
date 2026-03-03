@@ -8,6 +8,7 @@ interface DayData {
   date: string
   calories: number
   protein: number
+  weight: number | null
   items: { name: string; calories: number; protein: number; carbs: number; fat: number }[]
 }
 
@@ -77,7 +78,7 @@ export function HistoryTab({ coach, userId, calorieTarget }: Props) {
       const grouped: Record<string, DayData> = {}
       for (const row of data) {
         if (!grouped[row.session_date]) {
-          grouped[row.session_date] = { date: row.session_date, calories: 0, protein: 0, items: [] }
+          grouped[row.session_date] = { date: row.session_date, calories: 0, protein: 0, weight: null, items: [] }
         }
         grouped[row.session_date].calories += row.calories
         grouped[row.session_date].protein += row.protein
@@ -85,6 +86,23 @@ export function HistoryTab({ coach, userId, calorieTarget }: Props) {
           name: row.name, calories: row.calories, protein: row.protein, carbs: row.carbs, fat: row.fat,
         })
       }
+
+      // Fetch weight logs for the same window
+      const { data: weightData } = await supabase
+        .from('weight_logs')
+        .select('logged_date, weight_lbs')
+        .eq('user_id', userId)
+        .gte('logged_date', since.toISOString().split('T')[0])
+
+      for (const w of weightData ?? []) {
+        if (grouped[w.logged_date]) {
+          grouped[w.logged_date].weight = w.weight_lbs
+        } else {
+          // Day has weight but no food — still show it
+          grouped[w.logged_date] = { date: w.logged_date, calories: 0, protein: 0, weight: w.weight_lbs, items: [] }
+        }
+      }
+
       setAllData(grouped)
       setLoading(false)
     }
@@ -175,7 +193,7 @@ export function HistoryTab({ coach, userId, calorieTarget }: Props) {
           {weekDays.map(dateStr => {
             const { day, date, isToday, isFuture } = getDayMeta(dateStr)
             const dayData = allData[dateStr]
-            const logged = !!dayData && !isFuture
+            const logged = !!dayData && !isFuture && (dayData.calories > 0 || dayData.weight !== null)
             const dayColor = isFuture ? 'rgba(255,255,255,0.08)' : getDayColor(dayData?.calories ?? 0, calorieTarget, logged)
             const isExpanded = expandedDay === dateStr
 
@@ -205,19 +223,31 @@ export function HistoryTab({ coach, userId, calorieTarget }: Props) {
                   </div>
 
                   {logged ? (
-                    <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 16 }}>
-                      <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontFamily: 'var(--font-space-mono)', fontWeight: 700, fontSize: 15, color: dayColor }}>
-                          {dayData.calories.toLocaleString()}
+                    <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 14 }}>
+                      {dayData.weight && (
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontFamily: 'var(--font-space-mono)', fontWeight: 700, fontSize: 15, color: 'rgba(255,255,255,0.55)' }}>
+                            {dayData.weight}
+                          </div>
+                          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>lbs</div>
                         </div>
-                        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>kcal</div>
-                      </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontFamily: 'var(--font-space-mono)', fontWeight: 700, fontSize: 15, color: dayData.protein >= proteinTarget ? '#3DDC84' : 'rgba(255,255,255,0.5)' }}>
-                          {Math.round(dayData.protein)}g
+                      )}
+                      {dayData.calories > 0 && (
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontFamily: 'var(--font-space-mono)', fontWeight: 700, fontSize: 15, color: dayColor }}>
+                            {dayData.calories.toLocaleString()}
+                          </div>
+                          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>kcal</div>
                         </div>
-                        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>protein</div>
-                      </div>
+                      )}
+                      {dayData.protein > 0 && (
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontFamily: 'var(--font-space-mono)', fontWeight: 700, fontSize: 15, color: dayData.protein >= proteinTarget ? '#3DDC84' : 'rgba(255,255,255,0.5)' }}>
+                            {Math.round(dayData.protein)}g
+                          </div>
+                          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>protein</div>
+                        </div>
+                      )}
                       <div style={{ color: 'rgba(255,255,255,0.25)', fontSize: 12 }}>{isExpanded ? '▾' : '▸'}</div>
                     </div>
                   ) : (
