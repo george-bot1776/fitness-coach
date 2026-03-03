@@ -175,6 +175,14 @@
 .dot-pulse:nth-child(2) { animation-delay: 0.2s; }
 .dot-pulse:nth-child(3) { animation-delay: 0.4s; }
 
+/* ---- Mobile viewport lock ---- */
+/* dvh = dynamic viewport height — updates with browser chrome but NOT keyboard */
+/* interactiveWidget: resizes-visual keeps the layout stable when keyboard opens */
+.fc-shell {
+  height: 100vh;
+  height: 100dvh;
+}
+
 /* ---- Macro ring SVG ---- */
 .ring-fill {
   fill: none;

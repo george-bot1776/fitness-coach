@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { DashboardShell } from '@/components/dashboard/DashboardShell'
-import type { Profile, FoodLog, ActivityLog } from '@/types'
+import type { Profile, FoodLog, ActivityLog, WeightLog } from '@/types'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -17,10 +17,16 @@ export default async function DashboardPage() {
   if (!profile?.setup_complete) redirect('/setup')
 
   const today = new Date().toISOString().split('T')[0]
+  const since30 = new Date()
+  since30.setDate(since30.getDate() - 30)
 
-  const [{ data: foodLogs }, { data: activityLogs }] = await Promise.all([
+  const [{ data: foodLogs }, { data: activityLogs }, { data: weightLog }, { data: weightHistory }] = await Promise.all([
     supabase.from('food_logs').select('*').eq('user_id', user.id).eq('session_date', today).order('created_at'),
     supabase.from('activity_logs').select('*').eq('user_id', user.id).eq('session_date', today).order('created_at'),
+    supabase.from('weight_logs').select('*').eq('user_id', user.id).eq('logged_date', today).single(),
+    supabase.from('weight_logs').select('*').eq('user_id', user.id)
+      .gte('logged_date', since30.toISOString().split('T')[0])
+      .order('logged_date', { ascending: true }),
   ])
 
   return (
@@ -29,6 +35,8 @@ export default async function DashboardPage() {
       userId={user.id}
       initialFoodLogs={(foodLogs ?? []) as FoodLog[]}
       initialActivityLogs={(activityLogs ?? []) as ActivityLog[]}
+      initialWeightLbs={weightLog?.weight_lbs ?? null}
+      initialWeightHistory={(weightHistory ?? []) as WeightLog[]}
     />
   )
 }

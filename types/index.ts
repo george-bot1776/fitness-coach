@@ -5,6 +5,9 @@ export interface Profile {
   current_weight: number | null
   target_lbs: number | null
   calorie_target: number
+  goal: 'lose_weight' | 'build_muscle' | 'eat_better' | 'more_energy' | 'all' | null
+  baseline: 'good' | 'hit_or_miss' | 'mostly_bad' | 'no_idea' | null
+  activity_level: 'sedentary' | 'light' | 'moderate' | 'very_active' | null
   preferences: string[]
   coach_notes: string[]
   streaks: { logging: number; protein: number }
@@ -12,6 +15,14 @@ export interface Profile {
   setup_complete: boolean
   created_at: string
   updated_at: string
+}
+
+export interface WeightLog {
+  id: string
+  user_id: string
+  logged_date: string
+  weight_lbs: number
+  created_at: string
 }
 
 export interface Episode {
@@ -112,6 +123,7 @@ export type CoachResponseType =
   | { type: 'food_advice'; message: string }
   | { type: 'exception'; message: string; exception: { note: string; expires: string; followUp: boolean } }
   | { type: 'daily_summary'; message: string; summary: DailySummary }
+  | { type: 'weight_log'; message: string; weight: { lbs: number } }
   | { type: 'chat'; message: string }
   | { blocked: true; message: string }
 

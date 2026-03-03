@@ -5,19 +5,21 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { COACHES } from '@/lib/coaches'
 import { buildSystemPrompt } from '@/lib/prompts'
-import { buildContextString, saveException, saveFoodLog, saveActivityLog, summarizeSession } from '@/lib/memory'
+import { buildContextString, saveException, saveFoodLog, saveActivityLog, saveWeightLog, summarizeSession } from '@/lib/memory'
 import { Header } from './Header'
 import { CoachTab } from './CoachTab'
 import { ActivityTab } from './ActivityTab'
 import { TodayTab } from './TodayTab'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import type { Profile, FoodLog, ActivityLog, ChatMessage, CoachResponseType, FoodItem, ActivityItem, DailySummary } from '@/types'
+import type { Profile, FoodLog, ActivityLog, ChatMessage, CoachResponseType, FoodItem, ActivityItem, DailySummary, WeightLog } from '@/types'
 
 interface Props {
   profile: Profile
   userId: string
   initialFoodLogs: FoodLog[]
   initialActivityLogs: ActivityLog[]
+  initialWeightLbs: number | null
+  initialWeightHistory: WeightLog[]
 }
 
 interface DisplayMessage {
@@ -27,7 +29,7 @@ interface DisplayMessage {
   isLoading?: boolean
 }
 
-export function DashboardShell({ profile, userId, initialFoodLogs, initialActivityLogs }: Props) {
+export function DashboardShell({ profile, userId, initialFoodLogs, initialActivityLogs, initialWeightLbs, initialWeightHistory }: Props) {
   const router = useRouter()
   const coach = COACHES[profile.coach_id] ?? COACHES.aria
 
@@ -45,6 +47,8 @@ export function DashboardShell({ profile, userId, initialFoodLogs, initialActivi
   )
   const [dinnerSuggestion, setDinnerSuggestion] = useState<string | null>(null)
   const [dailySummary, setDailySummary] = useState<DailySummary | null>(null)
+  const [weightLbs, setWeightLbs] = useState<number | null>(initialWeightLbs)
+  const [weightHistory, setWeightHistory] = useState<WeightLog[]>(initialWeightHistory)
   const [isLoading, setIsLoading] = useState(false)
 
   // Apply coach accent CSS variable
@@ -68,7 +72,10 @@ export function DashboardShell({ profile, userId, initialFoodLogs, initialActivi
 
   // Send greeting on first load
   useEffect(() => {
-    sendMessage(`Hi! I'm ${profile.name}. I'm ready to start tracking with you today!`, false)
+    const greeting = profile.last_session
+      ? `I'm back. Give me a momentum update based on my last few sessions — look at the trend, keep it 2 sentences.`
+      : `Hi! I'm ${profile.name}. I'm ready to start tracking with you today!`
+    sendMessage(greeting, false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -204,6 +211,17 @@ export function DashboardShell({ profile, userId, initialFoodLogs, initialActivi
       await saveActivityLog(userId, { label: act.label, value: act.value, unit: act.unit, calories_burned: act.caloriesBurned })
     }
 
+    if (parsed.type === 'weight_log' && parsed.weight) {
+      const lbs = parsed.weight.lbs
+      setWeightLbs(lbs)
+      const today = new Date().toISOString().split('T')[0]
+      setWeightHistory(prev => {
+        const filtered = prev.filter(w => w.logged_date !== today)
+        return [...filtered, { id: '', user_id: userId, logged_date: today, weight_lbs: lbs, created_at: new Date().toISOString() }]
+      })
+      await saveWeightLog(userId, lbs)
+    }
+
     if (parsed.type === 'exception' && parsed.exception) {
       const ex = parsed.exception
       await saveException(userId, ex.note, ex.expires, ex.followUp)
@@ -225,7 +243,7 @@ export function DashboardShell({ profile, userId, initialFoodLogs, initialActivi
   }
 
   return (
-    <div className="flex flex-col h-screen max-w-[430px] mx-auto overflow-hidden"
+    <div className="flex flex-col max-w-[430px] mx-auto overflow-hidden fc-shell"
          style={{ background: 'var(--fc-bg)' }}>
       <Header
         coach={coach}
@@ -273,6 +291,17 @@ export function DashboardShell({ profile, userId, initialFoodLogs, initialActivi
             dinnerSuggestion={dinnerSuggestion}
             coach={coach}
             calorieTarget={profile.calorie_target}
+            userId={userId}
+            weightLbs={weightLbs}
+            weightHistory={weightHistory}
+            onWeightSaved={(lbs) => {
+              setWeightLbs(lbs)
+              const today = new Date().toISOString().split('T')[0]
+              setWeightHistory(prev => {
+                const filtered = prev.filter(w => w.logged_date !== today)
+                return [...filtered, { id: '', user_id: userId, logged_date: today, weight_lbs: lbs, created_at: new Date().toISOString() }]
+              })
+            }}
           />
         </TabsContent>
       </Tabs>

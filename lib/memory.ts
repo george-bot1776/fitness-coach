@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/client'
-import type { Profile, Episode, AppException, FoodLog, ActivityLog, ChatMessage } from '@/types'
+import type { Profile, Episode, AppException, FoodLog, ActivityLog, ChatMessage, WeightLog } from '@/types'
 
 // ---- Profile (Tier 3) ----------------------------------------
 
@@ -283,4 +283,41 @@ export async function saveActivityLog(userId: string, activity: {
   const supabase = createClient()
   const today = new Date().toISOString().split('T')[0]
   await supabase.from('activity_logs').insert({ user_id: userId, session_date: today, ...activity })
+}
+
+// ---- Weight Logs --------------------------------------------
+
+export async function getTodayWeightLog(userId: string): Promise<WeightLog | null> {
+  const supabase = createClient()
+  const today = new Date().toISOString().split('T')[0]
+  const { data } = await supabase
+    .from('weight_logs')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('logged_date', today)
+    .single()
+  return data ?? null
+}
+
+export async function getWeightHistory(userId: string, days = 30): Promise<WeightLog[]> {
+  const supabase = createClient()
+  const since = new Date()
+  since.setDate(since.getDate() - days)
+  const { data } = await supabase
+    .from('weight_logs')
+    .select('*')
+    .eq('user_id', userId)
+    .gte('logged_date', since.toISOString().split('T')[0])
+    .order('logged_date', { ascending: true })
+  return data ?? []
+}
+
+export async function saveWeightLog(userId: string, weightLbs: number): Promise<void> {
+  const supabase = createClient()
+  const today = new Date().toISOString().split('T')[0]
+  await supabase.from('weight_logs').upsert({
+    user_id: userId,
+    logged_date: today,
+    weight_lbs: weightLbs,
+  }, { onConflict: 'user_id,logged_date' })
 }
