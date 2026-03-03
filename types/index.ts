@@ -127,7 +127,7 @@ export type CoachResponseType =
   | { type: 'food_advice'; message: string }
   | { type: 'exception'; message: string; exception: { note: string; expires: string; followUp: boolean } }
   | { type: 'daily_summary'; message: string; summary: DailySummary }
-  | { type: 'weight_log'; message: string; weight: { lbs: number } }
+  | { type: 'weight_log'; message: string; weight: { lbs: number; date?: string } }
   | { type: 'chat'; message: string }
   | { blocked: true; message: string }
 

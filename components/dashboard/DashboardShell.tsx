@@ -233,14 +233,20 @@ export function DashboardShell({ profile, userId, initialFoodLogs, initialActivi
     }
 
     if (parsed.type === 'weight_log' && parsed.weight) {
-      const lbs = parsed.weight.lbs
-      setWeightLbs(lbs)
-      const today = new Date().toISOString().split('T')[0]
+      const { lbs, date } = parsed.weight
+      const logDate = date ?? (() => {
+        const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+      })()
+      const isToday = logDate === (() => {
+        const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+      })()
+      if (isToday) setWeightLbs(lbs)
       setWeightHistory(prev => {
-        const filtered = prev.filter(w => w.logged_date !== today)
-        return [...filtered, { id: '', user_id: userId, logged_date: today, weight_lbs: lbs, created_at: new Date().toISOString() }]
+        const filtered = prev.filter(w => w.logged_date !== logDate)
+        return [...filtered, { id: '', user_id: userId, logged_date: logDate, weight_lbs: lbs, created_at: new Date().toISOString() }]
+          .sort((a, b) => a.logged_date.localeCompare(b.logged_date))
       })
-      await saveWeightLog(userId, lbs)
+      await saveWeightLog(userId, lbs, date)
     }
 
     if (parsed.type === 'exception' && parsed.exception) {
@@ -319,10 +325,12 @@ export function DashboardShell({ profile, userId, initialFoodLogs, initialActivi
             streaks={profile.streaks}
             onWeightSaved={(lbs) => {
               setWeightLbs(lbs)
-              const today = new Date().toISOString().split('T')[0]
+              const d = new Date()
+              const today = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
               setWeightHistory(prev => {
                 const filtered = prev.filter(w => w.logged_date !== today)
                 return [...filtered, { id: '', user_id: userId, logged_date: today, weight_lbs: lbs, created_at: new Date().toISOString() }]
+                  .sort((a, b) => a.logged_date.localeCompare(b.logged_date))
               })
             }}
           />

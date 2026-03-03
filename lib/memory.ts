@@ -323,12 +323,11 @@ export async function getWeightHistory(userId: string, days = 30): Promise<Weigh
   return data ?? []
 }
 
-export async function saveWeightLog(userId: string, weightLbs: number): Promise<void> {
+export async function saveWeightLog(userId: string, weightLbs: number, date?: string): Promise<void> {
   const supabase = createClient()
-  const today = localDate()
   await supabase.from('weight_logs').upsert({
     user_id: userId,
-    logged_date: today,
+    logged_date: date ?? localDate(),
     weight_lbs: weightLbs,
   }, { onConflict: 'user_id,logged_date' })
 }

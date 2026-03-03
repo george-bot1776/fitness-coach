@@ -86,8 +86,8 @@ Pick the response type that best fits the user's message:
 5. Daily summary (user asks for summary or how they did):
 {"type":"daily_summary","message":"[your in-character intro]","summary":{"totalCalories":[number],"caloriesBurned":[number],"netCalories":[number],"protein":[grams],"highlight":"[biggest win]","improvement":"[one thing to improve]","tomorrowTip":"[one specific tip]"}}
 
-6. Weight logging (user mentions their body weight today):
-{"type":"weight_log","message":"[your in-character response]","weight":{"lbs":[number]}}
+6. Weight logging (user mentions their body weight, or asks to update/correct weight for a specific date):
+{"type":"weight_log","message":"[your in-character response]","weight":{"lbs":[number],"date":"[YYYY-MM-DD — only include if NOT today, resolve relative dates like 'yesterday' or 'Monday' using TODAY's date above]"}}
 
 7. General chat:
 {"type":"chat","message":"[your in-character response]"}
