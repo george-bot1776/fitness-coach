@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { COACHES } from '@/lib/coaches'
 import { buildSystemPrompt } from '@/lib/prompts'
-import { buildContextString, checkExceptions, saveException, saveFoodLog, saveActivityLog, saveWeightLog, summarizeSession } from '@/lib/memory'
+import { buildContextString, checkExceptions, saveEpisode, saveException, saveFoodLog, saveActivityLog, saveWeightLog, summarizeSession } from '@/lib/memory'
 import { Header } from './Header'
 import { CoachTab } from './CoachTab'
 import { ActivityTab } from './ActivityTab'
@@ -28,6 +28,7 @@ interface DisplayMessage {
   imageUrl?: string
   isLoading?: boolean
   isError?: boolean
+  summary?: DailySummary
 }
 
 export function DashboardShell({ profile, userId, initialFoodLogs, initialActivityLogs, initialWeightLbs, initialWeightHistory }: Props) {
@@ -249,6 +250,20 @@ export function DashboardShell({ profile, userId, initialFoodLogs, initialActivi
 
     if (parsed.type === 'daily_summary' && parsed.summary) {
       setDailySummary(parsed.summary)
+      // Attach summary card to the coach message in the feed
+      setDisplayMessages(prev => {
+        const updated = [...prev]
+        const last = updated[updated.length - 1]
+        if (last?.role === 'coach') updated[updated.length - 1] = { ...last, summary: parsed.summary }
+        return updated
+      })
+      // Persist as an episode
+      await saveEpisode(userId, parsed.message, [
+        `Calories: ${parsed.summary.totalCalories} eaten, ${parsed.summary.caloriesBurned} burned`,
+        `Protein: ${parsed.summary.protein}g`,
+        `Win: ${parsed.summary.highlight}`,
+        `Improve: ${parsed.summary.improvement}`,
+      ])
     }
   }
 

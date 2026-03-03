@@ -2,9 +2,10 @@
 
 import { useRef, useState, useEffect } from 'react'
 import { MessageBubble } from './MessageBubble'
-import type { Coach } from '@/types'
+import { SummaryCard } from './SummaryCard'
+import type { Coach, DailySummary } from '@/types'
 
-interface Message { role: 'user' | 'coach'; text: string; imageUrl?: string; isLoading?: boolean; isError?: boolean }
+interface Message { role: 'user' | 'coach'; text: string; imageUrl?: string; isLoading?: boolean; isError?: boolean; summary?: DailySummary }
 
 interface Props {
   coach: Coach
@@ -95,15 +96,17 @@ export function CoachTab({ coach, messages, onSend }: Props) {
       {/* Message feed */}
       <div ref={feedRef} style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 8px', display: 'flex', flexDirection: 'column', gap: 8 }}>
         {messages.map((msg, i) => (
-          <MessageBubble
-            key={i}
-            role={msg.role}
-            text={msg.text}
-            imageUrl={msg.imageUrl}
-            isLoading={msg.isLoading}
-            isError={msg.isError}
-            coach={coach}
-          />
+          <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 8, alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: msg.summary ? '100%' : '88%', width: msg.summary ? '100%' : undefined }}>
+            <MessageBubble
+              role={msg.role}
+              text={msg.text}
+              imageUrl={msg.imageUrl}
+              isLoading={msg.isLoading}
+              isError={msg.isError}
+              coach={coach}
+            />
+            {msg.summary && <SummaryCard summary={msg.summary} />}
+          </div>
         ))}
       </div>
 
