@@ -10,7 +10,7 @@ export interface Profile {
   activity_level: 'sedentary' | 'light' | 'moderate' | 'very_active' | null
   preferences: string[]
   coach_notes: string[]
-  streaks: { logging: number; protein: number }
+  streaks: { logging: number; protein: number; longestLogging?: number; longestProtein?: number }
   last_session: string | null
   setup_complete: boolean
   created_at: string

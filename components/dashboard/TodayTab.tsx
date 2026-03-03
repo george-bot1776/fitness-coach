@@ -18,7 +18,7 @@ interface Props {
   weightLbs: number | null
   weightHistory: WeightLog[]
   onWeightSaved: (lbs: number) => void
-  streaks: { logging: number; protein: number }
+  streaks: { logging: number; protein: number; longestLogging?: number; longestProtein?: number }
 }
 
 function Sparkline({ data, width = 100, height = 30, color }: { data: number[]; width?: number; height?: number; color: string }) {
@@ -231,6 +231,11 @@ export function TodayTab({ foodLog, editedFoodIds, onDeleteFood, dailySummary, d
                 </span>
               </div>
               <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>Day logging streak</div>
+              {(streaks.longestLogging ?? 0) > streaks.logging && (
+                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.2)', marginTop: 3 }}>
+                  Best: {streaks.longestLogging} days
+                </div>
+              )}
             </div>
             <div style={{ width: 1, background: 'rgba(255,255,255,0.06)', margin: '0 16px' }} />
             <div style={{ flex: 1 }}>
@@ -241,6 +246,11 @@ export function TodayTab({ foodLog, editedFoodIds, onDeleteFood, dailySummary, d
                 </span>
               </div>
               <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>Day protein streak</div>
+              {(streaks.longestProtein ?? 0) > streaks.protein && (
+                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.2)', marginTop: 3 }}>
+                  Best: {streaks.longestProtein} days
+                </div>
+              )}
             </div>
           </div>
         </div>

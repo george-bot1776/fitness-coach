@@ -267,19 +267,64 @@ ${transcript}`,
     const parsed = JSON.parse(clean)
     await saveEpisode(userId, parsed.summary, parsed.keyFacts ?? [])
 
-    // Update streak
+    // Update streaks
     const supabase = createClient()
     const { data: profile } = await supabase
       .from('profiles')
-      .select('streaks, last_session')
+      .select('streaks, last_session, calorie_target')
       .eq('id', userId)
       .single()
 
     if (profile) {
-      const today = new Date().toDateString()
-      const lastDay = profile.last_session ? new Date(profile.last_session).toDateString() : null
-      const streaks = profile.streaks as { logging: number; protein: number }
-      if (lastDay !== today) streaks.logging = (streaks.logging ?? 0) + 1
+      const today = localDate()
+      const yd = new Date(); yd.setDate(yd.getDate() - 1)
+      const yesterday = `${yd.getFullYear()}-${String(yd.getMonth()+1).padStart(2,'0')}-${String(yd.getDate()).padStart(2,'0')}`
+
+      // Convert last_session ISO timestamp → local date string
+      const lastDay = profile.last_session
+        ? (() => { const d = new Date(profile.last_session); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` })()
+        : null
+
+      type Streaks = { logging: number; protein: number; longestLogging?: number; longestProtein?: number }
+      const streaks: Streaks = { logging: 0, protein: 0, ...(profile.streaks ?? {}) }
+
+      // --- Logging streak ---
+      // Reset to 1 on first session OR after any gap, increment on consecutive day,
+      // leave unchanged if re-logging the same day
+      if (lastDay === null || lastDay < yesterday) {
+        streaks.logging = 1
+      } else if (lastDay === yesterday) {
+        streaks.logging = (streaks.logging ?? 0) + 1
+      }
+      // lastDay === today → multiple sessions today → no change
+
+      // --- Protein streak ---
+      // Query today's protein total and compare to goal
+      const { data: foodToday } = await supabase
+        .from('food_logs')
+        .select('protein')
+        .eq('user_id', userId)
+        .eq('session_date', today)
+
+      const totalProtein = foodToday?.reduce((s: number, f: { protein: number }) => s + f.protein, 0) ?? 0
+      const proteinTarget = Math.round(((profile.calorie_target ?? 2000) * 0.30) / 4)
+      const hitProtein = totalProtein >= proteinTarget
+
+      if (lastDay === null || lastDay < yesterday) {
+        // First session or missed days
+        streaks.protein = hitProtein ? 1 : 0
+      } else if (lastDay === yesterday) {
+        // Consecutive day
+        streaks.protein = hitProtein ? (streaks.protein ?? 0) + 1 : 0
+      } else if (lastDay === today) {
+        // Multiple sessions same day: only upgrade if now hitting protein and streak is 0
+        // (don't penalize if they haven't finished eating for the day)
+        if (hitProtein && (streaks.protein ?? 0) === 0) streaks.protein = 1
+      }
+
+      // --- Longest streaks ---
+      streaks.longestLogging = Math.max(streaks.longestLogging ?? 0, streaks.logging)
+      streaks.longestProtein = Math.max(streaks.longestProtein ?? 0, streaks.protein)
 
       await supabase.from('profiles').update({
         streaks,
