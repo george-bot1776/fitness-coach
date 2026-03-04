@@ -202,7 +202,10 @@ export function DashboardShell({ profile, userId, initialFoodLogs, initialActivi
       try {
         parsed = JSON.parse(clean)
       } catch {
-        parsed = { type: 'chat', message: raw }
+        // Malformed JSON — common cause: unescaped quotes in model output (e.g. 5'11")
+        // Extract the message field value via greedy regex match
+        const m = /"message"\s*:\s*"([\s\S]*)"/.exec(clean)
+        parsed = { type: 'chat', message: m ? m[1].replace(/\\n/g, '\n').replace(/\\"/g, '"') : raw }
       }
 
       setApiMessages(prev => [...prev, { role: 'assistant', content: raw }])
