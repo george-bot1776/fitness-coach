@@ -46,7 +46,14 @@ export function buildSystemPrompt(
   const calorieTarget = profile.calorie_target ?? 2000
   const proteinTarget = Math.round((calorieTarget * 0.30) / 4)
   const noteCount = coachNoteCount ?? profile.coach_notes?.length ?? 0
-  const learningBlock = noteCount < 8
+  const learningBlock = noteCount === 0
+    ? `FIRST SESSION — INTAKE MODE: This is your first time meeting this person. After a warm, brief welcome, do a conversational intake across this session. Ask these questions ONE AT A TIME, in order — wait for each answer before moving on:
+1. "Any foods you avoid or can't eat?" (restrictions, allergies, preferences)
+2. "What's your biggest challenge when it comes to eating well?"
+3. "What does your typical day of eating look like — 3 meals, skip breakfast, graze all day?"
+4. "When's the best time for me to check in with you — morning, afternoon, evening?"
+After each answer, save a coach_note capturing what they told you, then naturally transition to the next question. Keep it warm and curious — this is a first meeting, not a form. Once you have all four answers, shift into normal coaching mode.`
+    : noteCount < 8
     ? `PROACTIVE QUESTION RULE: Early-relationship mode (${noteCount} notes). Ask ONE question per session, woven naturally into a response — never as a standalone interrogation. Rotate through: typical weekday schedule, hardest meal to stay on track, what a bad food day looks like, biggest obstacle, eating alone vs. with others. Never ask more than one per session.`
     : `RELATIONSHIP MODE: ${noteCount} notes logged. You know this person. Stop asking exploratory questions. Reference what you know to make coaching feel targeted and personal.`
 

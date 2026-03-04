@@ -104,6 +104,6 @@ All 5 tasks shipped. Next session starts Phase 2.
 4.1 Macro Accuracy Validation Pipeline — `lib/macro-validation.ts` + food log edit UI (swipe-to-edit fallback)
 4.2 Weight Goal + Progress — target weight in settings, progress bar, projections
 4.3 Weekly Automated Summary — Monday morning coach summary
-4.4 Deep Onboarding V2 — 9 questions, dietary restrictions, challenges, checkin prefs
+4.4 Deep Onboarding V2 — coach collects dietary restrictions, challenges, meal pattern, check-in prefs conversationally via coach_note in first session (no new DB columns needed)
 4.5 Coach Stress Testing — `scripts/coach-stress-test.ts`
 4.6 Web Push Notifications — service worker, VAPID, Vercel cron
