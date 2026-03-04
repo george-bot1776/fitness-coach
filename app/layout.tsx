@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { DM_Sans, Space_Mono, Syne } from 'next/font/google'
 import './globals.css'
+import { ServiceWorkerRegistrar } from '@/components/ServiceWorkerRegistrar'
 
 const dmSans = DM_Sans({
   variable: '--font-dm-sans',
@@ -24,6 +25,7 @@ const syne = Syne({
 export const metadata: Metadata = {
   title: 'Fitness Coach AI',
   description: 'Your AI-powered nutrition & fitness companion',
+  manifest: '/manifest.json',
 }
 
 export const viewport = {
@@ -42,6 +44,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         style={{ background: 'var(--fc-bg)', color: 'var(--fc-text)', fontFamily: 'var(--font-dm-sans)' }}
       >
         {children}
+        <ServiceWorkerRegistrar />
       </body>
     </html>
   )

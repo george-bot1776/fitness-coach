@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { ProfileEditForm } from '@/components/settings/ProfileEditForm'
+import { NotificationToggle } from '@/components/notifications/NotificationToggle'
 import type { Profile } from '@/types'
 
 export default async function SettingsPage() {
@@ -16,5 +17,10 @@ export default async function SettingsPage() {
 
   if (!profile?.setup_complete) redirect('/setup')
 
-  return <ProfileEditForm profile={profile as Profile} userId={user.id} />
+  return (
+    <div className="space-y-6">
+      <ProfileEditForm profile={profile as Profile} userId={user.id} />
+      <NotificationToggle userId={user.id} />
+    </div>
+  )
 }
