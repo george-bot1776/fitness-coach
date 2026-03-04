@@ -30,6 +30,26 @@ export async function saveProfile(userId: string, updates: Partial<Profile>): Pr
     .upsert({ id: userId, ...updates, updated_at: new Date().toISOString() })
 }
 
+const MAX_COACH_NOTES = 20
+
+export async function saveCoachNote(userId: string, note: string): Promise<void> {
+  const supabase = createClient()
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('coach_notes')
+    .eq('id', userId)
+    .single()
+
+  const existing: string[] = profile?.coach_notes ?? []
+  const stamped = `[${localDate()}] ${note}`
+  const updated = [...existing, stamped].slice(-MAX_COACH_NOTES)
+
+  await supabase
+    .from('profiles')
+    .update({ coach_notes: updated, updated_at: new Date().toISOString() })
+    .eq('id', userId)
+}
+
 // ---- Episodes (Tier 2) ---------------------------------------
 
 const MAX_EPISODES = 7
@@ -178,8 +198,9 @@ export async function buildContextString(userId: string): Promise<string> {
     .single()
 
   if (profile?.coach_notes?.length) {
-    lines.push('COACH NOTES:')
-    profile.coach_notes.slice(-3).forEach((n: string) => lines.push(`  - ${n}`))
+    const total = profile.coach_notes.length
+    lines.push(`COACH NOTES (${total} total, showing last 8):`)
+    profile.coach_notes.slice(-8).forEach((n: string) => lines.push(`  - ${n}`))
   }
 
   if (profile?.streaks) {

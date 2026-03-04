@@ -77,12 +77,33 @@ All 5 tasks shipped. Next session starts Phase 2.
 - `types/index.ts` — FoodLogEdit, ActivityLogEdit, FoodLogBackdate, ActivityLogBackdate interfaces + CoachResponseType variants
 - `components/dashboard/DashboardShell.tsx` — handleCoachResponse extended for all 4 new types
 
-**Deferred:** UI swipe-to-edit/delete on food log cards (chat-based agent covers all same actions)
+**Also shipped (same session):**
+- UI delete buttons on food/activity cards (two-tap: × → Delete/✕, red flash)
+- State upgraded to FoodLog[]/ActivityLog[] so entries have DB IDs for immediate UI delete
+- saveFoodLog + saveActivityLog now return inserted record with ID
+- "edited" badge on chat-corrected food entries (session-scoped)
 
-### Phase 3 Next Tasks (pick up here)
-3.1 Macro Accuracy Validation Pipeline — `lib/macro-validation.ts` + food log edit UI (swipe-to-edit fallback)
-3.2 Weight Goal + Progress — target weight in settings, progress bar, projections
-3.3 Weekly Automated Summary — Monday morning coach summary
-3.4 Deep Onboarding V2 — 9 questions, dietary restrictions, challenges, checkin prefs
-3.5 Coach Stress Testing — `scripts/coach-stress-test.ts`
-3.6 Web Push Notifications — service worker, VAPID, Vercel cron
+**Streak validation fixes (Task 1.4 hardening):**
+- Logging streak now resets to 1 on missed days (was: never reset)
+- Protein streak now calculated from food_logs vs protein target (was: never written)
+- Longest streaks tracked in streaks JSONB: longestLogging, longestProtein
+- TodayTab shows "Best: N days" when current streak < personal best
+
+### Phase 3: Agentic Coach Memory — COMPLETE ✅ (2026-03-03)
+
+**Shipped:**
+- `coach_note` response type — coach saves persistent observations silently to DB
+- `saveCoachNote` in `lib/memory.ts` — rolling window of 20 notes, date-stamped
+- `buildContextString` now shows last 8 notes with total count header
+- `buildSystemPrompt` gains optional `coachNoteCount` param + COACH LEARNING PROTOCOL block
+- Early-relationship mode (< 8 notes): proactive question per session; after 8 notes: RELATIONSHIP MODE
+- All 4 coach personalities expanded with RELATIONSHIP ARC, SIGNATURE MOVES, WHAT YOU NOTICE AND WRITE DOWN
+- DashboardShell: imports `saveCoachNote`, passes `coachNoteCount`, handles `coach_note` response type
+
+### Phase 4 Next Tasks (pick up here)
+4.1 Macro Accuracy Validation Pipeline — `lib/macro-validation.ts` + food log edit UI (swipe-to-edit fallback)
+4.2 Weight Goal + Progress — target weight in settings, progress bar, projections
+4.3 Weekly Automated Summary — Monday morning coach summary
+4.4 Deep Onboarding V2 — 9 questions, dietary restrictions, challenges, checkin prefs
+4.5 Coach Stress Testing — `scripts/coach-stress-test.ts`
+4.6 Web Push Notifications — service worker, VAPID, Vercel cron

@@ -170,6 +170,7 @@ export type CoachResponseType =
   | { type: 'food_log_backdate'; message: string; payload: FoodLogBackdate }
   | { type: 'activity_log_backdate'; message: string; payload: ActivityLogBackdate }
   | { type: 'chat'; message: string }
+  | { type: 'coach_note'; message: string; note: string }
   | { blocked: true; message: string }
 
 export interface SessionState {

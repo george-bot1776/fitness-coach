@@ -37,13 +37,18 @@ export function buildSystemPrompt(
   coach: Coach,
   profile: Profile,
   contextString: string,
-  sessionStats: { caloriesEaten: number; caloriesBurned: number; proteinEaten: number; foodsLogged: string; activitiesLogged: string }
+  sessionStats: { caloriesEaten: number; caloriesBurned: number; proteinEaten: number; foodsLogged: string; activitiesLogged: string },
+  coachNoteCount?: number
 ): string {
   const today = new Date().toLocaleDateString('en-US', {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
   })
   const calorieTarget = profile.calorie_target ?? 2000
   const proteinTarget = Math.round((calorieTarget * 0.30) / 4)
+  const noteCount = coachNoteCount ?? profile.coach_notes?.length ?? 0
+  const learningBlock = noteCount < 8
+    ? `PROACTIVE QUESTION RULE: Early-relationship mode (${noteCount} notes). Ask ONE question per session, woven naturally into a response — never as a standalone interrogation. Rotate through: typical weekday schedule, hardest meal to stay on track, what a bad food day looks like, biggest obstacle, eating alone vs. with others. Never ask more than one per session.`
+    : `RELATIONSHIP MODE: ${noteCount} notes logged. You know this person. Stop asking exploratory questions. Reference what you know to make coaching feel targeted and personal.`
 
   const goalLine = profile.goal ? `Goal: ${GOAL_LABELS[profile.goal] ?? profile.goal}` : ''
   const activityLine = profile.activity_level ? `Activity level: ${ACTIVITY_LABELS[profile.activity_level] ?? profile.activity_level}` : ''
@@ -58,6 +63,20 @@ COACHING: ${profile.name ?? 'User'} | Target: ${calorieTarget} kcal/day | Protei
 ${[goalLine, activityLine, baselineLine, weightLine].filter(Boolean).join(' | ')}
 ${profile.preferences?.length ? `Preferences/restrictions: ${profile.preferences.join(', ')}` : ''}
 ${contextString || ''}
+
+COACH LEARNING PROTOCOL:
+You currently have ${noteCount} permanent notes about this user.
+
+SAVE A COACH NOTE whenever the user reveals:
+- Lifestyle patterns: eating timing, meal skipping, night eating, breakfast habits
+- Schedule constraints: work schedule, travel, meal prep days, rushed meals
+- Food preferences or aversions beyond their profile restrictions
+- Recurring challenges: weekend falloffs, stress eating, social eating, cravings
+- Emotional relationship with food: guilt, reward, restriction, comfort eating
+- Casual goals not in their formal goal field: "I want to run a 5K," "beach trip in June"
+- Social eating patterns: family dinners, work lunches, weekend drinking
+
+${learningBlock}
 
 CURRENT SESSION STATS:
 Calories eaten: ${sessionStats.caloriesEaten}
@@ -104,6 +123,11 @@ For delete, omit the updated_* fields.
 
 11. General chat:
 {"type":"chat","message":"[your in-character response]"}
+
+12. Save a coach note (user reveals something important about their lifestyle, patterns, or preferences):
+{"type":"coach_note","message":"[your natural in-character response to what they shared]","note":"[concise third-person factual observation, e.g. 'User stress-eats Sunday evenings before the work week']"}
+
+The note is saved to permanent memory. Write it as a specific, factual, third-person observation — not a paraphrase. Bad: "user struggles sometimes." Good: "User's biggest meal is dinner; lunch is typically skipped on workdays."
 
 DATA AGENT RULES — you are the user's data agent. When they ask to correct, update, delete, or backdate any logged data, you MUST handle it — never tell them to edit manually.
 

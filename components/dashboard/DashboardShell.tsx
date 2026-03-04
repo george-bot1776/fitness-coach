@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { COACHES } from '@/lib/coaches'
 import { buildSystemPrompt } from '@/lib/prompts'
-import { buildContextString, checkExceptions, saveEpisode, saveException, saveFoodLog, saveActivityLog, saveWeightLog, summarizeSession, saveFoodLogForDate, saveActivityLogForDate, updateFoodLog, deleteFoodLog, updateActivityLog, deleteActivityLog } from '@/lib/memory'
+import { buildContextString, checkExceptions, saveCoachNote, saveEpisode, saveException, saveFoodLog, saveActivityLog, saveWeightLog, summarizeSession, saveFoodLogForDate, saveActivityLogForDate, updateFoodLog, deleteFoodLog, updateActivityLog, deleteActivityLog } from '@/lib/memory'
 import { matchFoodEntry, matchActivityEntry } from '@/lib/entry-matcher'
 import { Header } from './Header'
 import { CoachTab } from './CoachTab'
@@ -167,7 +167,7 @@ export function DashboardShell({ profile, userId, initialFoodLogs, initialActivi
       proteinEaten: Math.round(foodLog.reduce((s, f) => s + f.protein, 0)),
       foodsLogged: foodLog.map(f => f.name).join(', '),
       activitiesLogged: activityLog.map(a => a.label).join(', '),
-    })
+    }, profile.coach_notes?.length ?? 0)
 
     const token = await getAccessToken()
 
@@ -346,6 +346,10 @@ export function DashboardShell({ profile, userId, initialFoodLogs, initialActivi
     if (parsed.type === 'exception' && parsed.exception) {
       const ex = parsed.exception
       await saveException(userId, ex.note, ex.expires, ex.followUp)
+    }
+
+    if (parsed.type === 'coach_note' && parsed.note) {
+      await saveCoachNote(userId, parsed.note)
     }
 
     if (parsed.type === 'daily_summary' && parsed.summary) {
