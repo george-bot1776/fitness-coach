@@ -80,8 +80,22 @@ export function DashboardShell({ profile, userId, initialFoodLogs, initialActivi
     return () => window.removeEventListener('beforeunload', handleUnload)
   }, [apiMessages, userId])
 
-  // Send greeting on first load, checking for expired exception follow-ups
+  const chatKey = `fc-chat-${userId}-${todayStr()}`
+
+  // Restore saved session or fire greeting on first load
   useEffect(() => {
+    const saved = sessionStorage.getItem(chatKey)
+    if (saved) {
+      try {
+        const { display, api } = JSON.parse(saved)
+        if (display?.length > 0) {
+          setDisplayMessages(display)
+          setApiMessages(api ?? [])
+          return
+        }
+      } catch { /* fallthrough to greeting */ }
+    }
+
     async function initGreeting() {
       const triggered = await checkExceptions(userId)
 
@@ -113,6 +127,20 @@ export function DashboardShell({ profile, userId, initialFoodLogs, initialActivi
     initGreeting()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Persist chat to sessionStorage on every change
+  useEffect(() => {
+    const clean = displayMessages.filter(m => !m.isLoading)
+    if (clean.length === 0) return
+    // Strip base64 image data from non-last api messages before storing
+    const apiForStorage = apiMessages.map((msg, idx) => {
+      if (idx === apiMessages.length - 1 || typeof msg.content === 'string') return msg
+      const textOnly = (msg.content as Array<{type: string; text?: string}>).filter(b => b.type === 'text')
+      return { role: msg.role, content: textOnly.length ? textOnly : [{ type: 'text', text: '[photo]' }] }
+    })
+    sessionStorage.setItem(chatKey, JSON.stringify({ display: clean, api: apiForStorage }))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [displayMessages, apiMessages])
 
   const getAccessToken = useCallback(async (): Promise<string> => {
     const supabase = createClient()
