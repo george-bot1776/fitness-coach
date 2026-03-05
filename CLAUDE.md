@@ -100,9 +100,19 @@ All 5 tasks shipped. Next session starts Phase 2.
 - All 4 coach personalities expanded with RELATIONSHIP ARC, SIGNATURE MOVES, WHAT YOU NOTICE AND WRITE DOWN
 - DashboardShell: imports `saveCoachNote`, passes `coachNoteCount`, handles `coach_note` response type
 
+### Phase 4.2: Weight Goal + Progress — COMPLETE ✅ (2026-03-04)
+
+**Shipped:**
+- `ProfileEditForm.tsx` — "Weight Goal" section: Starting Weight (→ `current_weight`) + Goal Weight (→ `target_lbs`) inputs
+- `DashboardShell.tsx` — passes `targetLbs` and `startingWeight` to TodayTab
+- `TodayTab.tsx` — "Weight Goal" card below weight card:
+  - Progress bar: start → current → goal with % complete
+  - "X lbs to go" label (turns green at goal)
+  - "At current pace → [date]" projection from weightHistory trend
+  - Graceful fallback: "Set a weight goal →" link if no target set
+
 ### Phase 4 Next Tasks (pick up here)
 4.1 Macro Accuracy Validation Pipeline — `lib/macro-validation.ts` + food log edit UI (swipe-to-edit fallback)
-4.2 Weight Goal + Progress — target weight in settings, progress bar, projections
 4.3 Weekly Automated Summary — Monday morning coach summary
 4.4 Deep Onboarding V2 — coach collects dietary restrictions, challenges, meal pattern, check-in prefs conversationally via coach_note in first session (no new DB columns needed)
 4.5 Coach Stress Testing — `scripts/coach-stress-test.ts`

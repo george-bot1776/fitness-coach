@@ -33,6 +33,8 @@ export function ProfileEditForm({ profile, userId }: Props) {
   const [goal, setGoal] = useState<Goal>(profile.goal)
   const [activityLevel, setActivityLevel] = useState<ActivityLevel>(profile.activity_level)
   const [coachId, setCoachId] = useState(profile.coach_id)
+  const [startingWeight, setStartingWeight] = useState(profile.current_weight ? String(profile.current_weight) : '')
+  const [targetWeight, setTargetWeight] = useState(profile.target_lbs ? String(profile.target_lbs) : '')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
 
@@ -47,12 +49,16 @@ export function ProfileEditForm({ profile, userId }: Props) {
     if (!name.trim()) return
     setSaving(true)
     const calorieTarget = deriveCalorieTarget(goal, activityLevel)
+    const sw = parseFloat(startingWeight)
+    const tw = parseFloat(targetWeight)
     await saveProfile(userId, {
       name: name.trim(),
       goal,
       activity_level: activityLevel,
       calorie_target: calorieTarget,
       coach_id: coachId,
+      ...(startingWeight && !isNaN(sw) ? { current_weight: sw } : {}),
+      ...(targetWeight && !isNaN(tw) ? { target_lbs: tw } : {}),
     })
     setSaving(false)
     setSaved(true)
@@ -187,6 +193,49 @@ export function ProfileEditForm({ profile, userId }: Props) {
             <OptionBtn label="Light" sub="Walk sometimes, maybe gym once a week" selected={activityLevel === 'light'} onClick={() => setActivityLevel('light')} />
             <OptionBtn label="Moderate" sub="Work out 3–4x a week" selected={activityLevel === 'moderate'} onClick={() => setActivityLevel('moderate')} />
             <OptionBtn label="Very active" sub="Train 5+ days, physical job, or both" selected={activityLevel === 'very_active'} onClick={() => setActivityLevel('very_active')} />
+          </div>
+        </section>
+
+        {/* Weight Goal */}
+        <section>
+          <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--fc-text-dim)', letterSpacing: '0.08em', textTransform: 'uppercase', display: 'block', marginBottom: 10 }}>
+            Weight Goal
+          </label>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 11, color: 'var(--fc-text-dim)', marginBottom: 6 }}>Starting weight (lbs)</div>
+              <input
+                type="number"
+                value={startingWeight}
+                onChange={e => setStartingWeight(e.target.value)}
+                placeholder="e.g. 210"
+                style={{
+                  width: '100%', padding: '12px 14px',
+                  borderRadius: 14, fontSize: 15,
+                  background: 'var(--fc-surface2)', border: '1px solid var(--fc-border)',
+                  color: 'var(--fc-text)', outline: 'none',
+                  fontFamily: 'var(--font-dm-sans)',
+                  boxSizing: 'border-box',
+                }}
+              />
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 11, color: 'var(--fc-text-dim)', marginBottom: 6 }}>Goal weight (lbs)</div>
+              <input
+                type="number"
+                value={targetWeight}
+                onChange={e => setTargetWeight(e.target.value)}
+                placeholder="e.g. 185"
+                style={{
+                  width: '100%', padding: '12px 14px',
+                  borderRadius: 14, fontSize: 15,
+                  background: 'var(--fc-surface2)', border: '1px solid var(--fc-border)',
+                  color: 'var(--fc-text)', outline: 'none',
+                  fontFamily: 'var(--font-dm-sans)',
+                  boxSizing: 'border-box',
+                }}
+              />
+            </div>
           </div>
         </section>
 

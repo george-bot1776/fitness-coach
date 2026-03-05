@@ -17,6 +17,8 @@ interface Props {
   userId: string
   weightLbs: number | null
   weightHistory: WeightLog[]
+  targetLbs: number | null
+  startingWeight: number | null
   onWeightSaved: (lbs: number) => void
   streaks: { logging: number; protein: number; longestLogging?: number; longestProtein?: number }
 }
@@ -53,7 +55,7 @@ function Sparkline({ data, width = 100, height = 30, color }: { data: number[]; 
   )
 }
 
-export function TodayTab({ foodLog, editedFoodIds, onDeleteFood, dailySummary, dinnerSuggestion, coach, calorieTarget, userId, weightLbs, weightHistory, onWeightSaved, streaks }: Props) {
+export function TodayTab({ foodLog, editedFoodIds, onDeleteFood, dailySummary, dinnerSuggestion, coach, calorieTarget, userId, weightLbs, weightHistory, targetLbs, startingWeight, onWeightSaved, streaks }: Props) {
   const [weightInput, setWeightInput] = useState('')
   const [saving, setSaving] = useState(false)
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
@@ -73,6 +75,35 @@ export function TodayTab({ foodLog, editedFoodIds, onDeleteFood, dailySummary, d
   const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7)
   const weekOldEntry = weightHistory.find(w => new Date(w.logged_date) >= weekAgo)
   const weekDelta = weightLbs && weekOldEntry ? weightLbs - weekOldEntry.weight_lbs : null
+
+  // Weight goal progress
+  const effectiveCurrent = weightLbs ?? (weightHistory.length > 0 ? weightHistory[weightHistory.length - 1].weight_lbs : null)
+  const goalStart = startingWeight ?? (weightHistory.length > 0 ? weightHistory[0].weight_lbs : null)
+  let goalPct: number | null = null
+  let lbsToGoal: number | null = null
+  let projectedDate: string | null = null
+  if (targetLbs !== null && effectiveCurrent !== null) {
+    lbsToGoal = targetLbs - effectiveCurrent
+    if (goalStart !== null && goalStart !== targetLbs) {
+      const totalDist = targetLbs - goalStart
+      const coveredDist = effectiveCurrent - goalStart
+      goalPct = Math.min(100, Math.max(0, Math.round((coveredDist / totalDist) * 100)))
+    }
+    if (weightHistory.length >= 2) {
+      const sorted = [...weightHistory].sort((a, b) => a.logged_date.localeCompare(b.logged_date))
+      const oldest = sorted[0]; const newest = sorted[sorted.length - 1]
+      const daysBetween = Math.max(1, (new Date(newest.logged_date).getTime() - new Date(oldest.logged_date).getTime()) / 86400000)
+      const ratePerDay = (newest.weight_lbs - oldest.weight_lbs) / daysBetween
+      const remaining = targetLbs - effectiveCurrent
+      if (Math.abs(ratePerDay) > 0.001 && Math.sign(ratePerDay) === Math.sign(remaining)) {
+        const daysToGoal = Math.round(remaining / ratePerDay)
+        if (daysToGoal > 0 && daysToGoal < 1000) {
+          const d = new Date(); d.setDate(d.getDate() + daysToGoal)
+          projectedDate = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+        }
+      }
+    }
+  }
 
   async function handleLogWeight() {
     const lbs = parseFloat(weightInput)
@@ -192,6 +223,56 @@ export function TodayTab({ foodLog, editedFoodIds, onDeleteFood, dailySummary, d
             ) : null}
           </div>
         </div>
+      </div>
+
+      {/* Weight Goal */}
+      <div>
+        <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(255,255,255,0.3)', marginBottom: 10 }}>
+          Weight Goal
+        </div>
+        {targetLbs === null ? (
+          <a href="/settings" style={{
+            ...cardStyle, padding: '14px 18px', display: 'flex', alignItems: 'center',
+            justifyContent: 'space-between', textDecoration: 'none', color: 'rgba(255,255,255,0.35)', fontSize: 13,
+          }}>
+            <span>Set a weight goal</span>
+            <span style={{ fontSize: 16, opacity: 0.4 }}>→</span>
+          </a>
+        ) : (
+          <div style={{ ...cardStyle, padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>Goal</span>
+                <span style={{ fontFamily: 'var(--font-space-mono)', fontWeight: 700, fontSize: 20, color: coach.color }}>{targetLbs}</span>
+                <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)' }}>lbs</span>
+              </div>
+              {lbsToGoal !== null && (
+                <div style={{ textAlign: 'right' }}>
+                  <span style={{ fontFamily: 'var(--font-space-mono)', fontSize: 13, fontWeight: 700, color: Math.abs(lbsToGoal) < 1 ? '#3DDC84' : 'rgba(255,255,255,0.6)' }}>
+                    {Math.abs(lbsToGoal) < 0.5 ? 'Goal reached!' : `${lbsToGoal > 0 ? '+' : ''}${lbsToGoal.toFixed(1)} lbs to go`}
+                  </span>
+                </div>
+              )}
+            </div>
+            {goalPct !== null && (
+              <div>
+                <div style={{ height: 6, borderRadius: 99, background: 'rgba(255,255,255,0.07)', overflow: 'hidden' }}>
+                  <div style={{ height: '100%', borderRadius: 99, width: `${goalPct}%`, background: goalPct >= 100 ? '#3DDC84' : coach.color, transition: 'width 0.4s ease' }} />
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 5, fontSize: 10, color: 'rgba(255,255,255,0.25)' }}>
+                  <span>{goalStart} lbs</span>
+                  <span>{goalPct}%</span>
+                  <span>{targetLbs} lbs</span>
+                </div>
+              </div>
+            )}
+            {projectedDate && (
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>
+                At current pace → <span style={{ color: coach.color, fontWeight: 600 }}>{projectedDate}</span>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Daily summary */}

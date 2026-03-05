@@ -436,6 +436,8 @@ export function DashboardShell({ profile, userId, initialFoodLogs, initialActivi
             userId={userId}
             weightLbs={weightLbs}
             weightHistory={weightHistory}
+            targetLbs={profile.target_lbs ?? null}
+            startingWeight={profile.current_weight ?? null}
             streaks={profile.streaks}
             onWeightSaved={(lbs) => {
               setWeightLbs(lbs)
